@@ -1,0 +1,1 @@
+import{o as e,e as a,t as o,C as i}from"./index-DBT5KPhA.js";const l={__name:"InsigniaEstado",props:{activo:Boolean,textoSi:{type:String,default:"Activo"},textoNo:{type:String,default:"Inactivo"}},setup(t){return(n,s)=>(e(),a("span",{class:i(["insignia",t.activo?"bg-emerald-50 text-emerald-700":"bg-slate-100 text-slate-600"])},o(t.activo?t.textoSi:t.textoNo),3))}};export{l as _};

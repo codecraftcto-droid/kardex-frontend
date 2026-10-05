@@ -1,0 +1,29 @@
+{
+  "name": "kardex-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "dev:movil": "vite --mode movil"
+  },
+  "dependencies": {
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
+    "axios": "^1.12.2",
+    "pinia": "^3.0.3",
+    "socket.io-client": "^4.8.1",
+    "vue": "^3.5.22",
+    "vue-router": "^4.5.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "tailwindcss": "^4.1.14",
+    "vite": "^7.1.9",
+    "vite-plugin-pwa": "^2.0.0"
+  }
+}

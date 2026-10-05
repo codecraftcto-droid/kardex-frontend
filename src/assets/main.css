@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --color-marca-50: #f0fdfa;
+  --color-marca-100: #ccfbf1;
+  --color-marca-600: #0d9488;
+  --color-marca-700: #0f766e;
+  --color-marca-800: #115e59;
+}
+
+/* Utilidades base del sistema: objetivos táctiles de al menos 44px (min-h-11) */
+@utility btn {
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium transition
+    focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-marca-600 disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility btn-primario { @apply btn bg-marca-700 text-white hover:bg-marca-800; }
+@utility btn-secundario { @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50; }
+@utility btn-peligro { @apply btn bg-red-600 text-white hover:bg-red-700; }
+@utility btn-texto { @apply btn px-2 text-marca-700 hover:bg-marca-50; }
+@utility input {
+  @apply block min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-base text-slate-800 sm:text-sm
+    placeholder:text-slate-400 focus:border-marca-600 focus:ring-2 focus:ring-marca-100 focus:outline-none disabled:bg-slate-100;
+}
+@utility etiqueta { @apply mb-1 block text-sm font-medium text-slate-700; }
+@utility tarjeta { @apply rounded-xl border border-slate-200 bg-white shadow-sm; }
+@utility insignia { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
+
+/* Espacio para la barra inferior en móvil, respetando el notch */
+@utility pb-barra-movil {
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  @media (width >= 64rem) { padding-bottom: 2rem; }
+}
+
+/* Selects: flecha propia con margen respecto al borde (la nativa queda pegada) */
+@layer components {
+  select.input {
+    appearance: none;
+    padding-right: 2.5rem;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='2' stroke='%2364748b'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='m19.5 8.25-7.5 7.5-7.5-7.5'/%3e%3c/svg%3e");
+    background-position: right 0.75rem center;
+    background-repeat: no-repeat;
+    background-size: 1rem;
+    text-overflow: ellipsis;
+  }
+  select.input:disabled { background-image: none; padding-right: 0.75rem; }
+}

@@ -34,3 +34,10 @@ export function estadoStock(s) {
   if (c === 0) return { texto: 'Sin stock', clase: 'bg-slate-100 text-slate-600' };
   return { texto: 'Normal', clase: 'bg-emerald-50 text-emerald-700' };
 }
+
+/** Columnas elegibles del kardex (cada una se repite en Entradas, Salidas y Saldo). */
+export const columnasKardex = (costos) => [
+  { clave: 'movimiento', titulo: 'Fecha y movimiento' },
+  { clave: 'detalle', titulo: 'Motivo y documento' },
+  ...(costos ? [{ clave: 'cunit', titulo: 'Costo unitario' }, { clave: 'total', titulo: 'Costo total' }] : []),
+];

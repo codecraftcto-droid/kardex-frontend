@@ -4,9 +4,15 @@ import { useRoute, useRouter } from 'vue-router';
 import { usePlataforma } from '@/stores/plataforma';
 import { apiPlataforma } from '@/services/apiPlataforma';
 import { mensajeError } from '@/services/api';
+import TarjetaAuth from '@/components/TarjetaAuth.vue';
+import FormCredenciales from '@/components/FormCredenciales.vue';
 import CampoCodigo from '@/components/CampoCodigo.vue';
 import CodigosRecuperacion from '@/components/CodigosRecuperacion.vue';
 
+/**
+ * Ingreso del equipo de la plataforma (super admin / soporte). Es un acceso SEPARADO del de
+ * los estudios: otra tabla de usuarios, otro secreto de tokens y 2FA obligatoria.
+ */
 const plataforma = usePlataforma();
 const route = useRoute();
 const router = useRouter();
@@ -64,53 +70,57 @@ function continuar() {
   plataforma.completarLogin(pendiente.value);
   entrar();
 }
+const reiniciar = () => ((paso.value = 'credenciales'), (codigo.value = ''), (alta.value = null));
 </script>
 
 <template>
-  <div class="flex min-h-dvh items-center justify-center bg-slate-900 px-4 py-10">
-    <div class="w-full max-w-sm">
-      <div class="mb-6 text-center text-white">
-        <img src="/favicon.svg" alt="" class="mx-auto mb-3 size-12" />
-        <h1 class="text-xl font-semibold">Kardex Plataforma</h1>
-        <p class="text-sm text-slate-400">Acceso exclusivo para administración del servicio</p>
-      </div>
-      <div class="tarjeta p-5 sm:p-6">
-        <form v-if="paso === 'credenciales'" class="space-y-4" @submit.prevent="enviarCredenciales">
-          <div><label class="etiqueta" for="pe">Correo</label><input id="pe" v-model="email" type="email" class="input" autocomplete="username" required autofocus /></div>
-          <div><label class="etiqueta" for="pp">Contraseña</label><input id="pp" v-model="password" type="password" class="input" autocomplete="current-password" required /></div>
-          <p class="text-xs text-slate-500">La verificación en dos pasos es obligatoria en la plataforma.</p>
-          <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
-          <button class="btn w-full bg-slate-900 text-white hover:bg-slate-800" :disabled="enviando">Continuar</button>
-        </form>
+  <TarjetaAuth
+    variante="plataforma"
+    :titulo="{ credenciales: 'Panel de la plataforma', verificar: 'Verificación en dos pasos', configurar: 'Configure la verificación en dos pasos', codigos: 'Códigos de recuperación' }[paso]"
+    :subtitulo="paso === 'credenciales' ? 'Acceso exclusivo para la administración del servicio.' : email"
+  >
+    <FormCredenciales
+      v-if="paso === 'credenciales'"
+      v-model:email="email"
+      v-model:password="password"
+      :error="error"
+      :enviando="enviando"
+      texto-boton="Continuar"
+      placeholder-correo="usted@codecraft.net.pe"
+      nota="Se pedirá el código de su aplicación autenticadora"
+      @enviar="enviarCredenciales"
+    />
 
-        <form v-else-if="paso === 'verificar'" class="space-y-4" @submit.prevent="verificar">
-          <p class="text-sm text-slate-600">{{ recuperacion ? 'Ingrese un código de recuperación.' : 'Código de 6 dígitos de su aplicación autenticadora.' }}</p>
-          <CampoCodigo v-model="codigo" :recuperacion="recuperacion" />
-          <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
-          <button class="btn w-full bg-slate-900 text-white hover:bg-slate-800" :disabled="enviando">Verificar</button>
-          <button type="button" class="btn-texto w-full" @click="(recuperacion = !recuperacion), (codigo = '')">
-            {{ recuperacion ? 'Usar la aplicación' : 'Usar un código de recuperación' }}
-          </button>
-        </form>
+    <form v-else-if="paso === 'verificar'" class="space-y-4" @submit.prevent="verificar">
+      <p class="text-sm text-slate-600">{{ recuperacion ? 'Ingrese uno de sus códigos de recuperación.' : 'Ingrese el código de 6 dígitos de su aplicación autenticadora.' }}</p>
+      <CampoCodigo v-model="codigo" :recuperacion="recuperacion" />
+      <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
+      <button class="btn-primario min-h-12 w-full text-base" :disabled="enviando">{{ enviando ? 'Verificando…' : 'Verificar' }}</button>
+      <button type="button" class="btn-texto w-full" @click="(recuperacion = !recuperacion), (codigo = '')">
+        {{ recuperacion ? 'Usar el código de la aplicación' : '¿Perdió su celular? Use un código de recuperación' }}
+      </button>
+    </form>
 
-        <form v-else-if="paso === 'configurar'" class="space-y-4" @submit.prevent="activar">
-          <p class="text-sm text-slate-600">Primer ingreso: configure la verificación en dos pasos escaneando el código con su aplicación autenticadora.</p>
-          <img :src="alta.qr" alt="Código QR" class="mx-auto size-48 rounded-lg border border-slate-200" />
-          <details class="text-xs text-slate-500">
-            <summary class="cursor-pointer">Ingresar la clave manualmente</summary>
-            <code class="mt-1 block rounded bg-slate-100 p-2 break-all">{{ alta.secreto }}</code>
-          </details>
-          <CampoCodigo v-model="codigo" />
-          <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
-          <button class="btn w-full bg-slate-900 text-white hover:bg-slate-800" :disabled="enviando">Activar y entrar</button>
-        </form>
+    <form v-else-if="paso === 'configurar'" class="space-y-4" @submit.prevent="activar">
+      <p class="text-sm text-slate-600">Primer ingreso: escanee el código con Google Authenticator, Microsoft Authenticator o Authy, y escriba el código que aparece.</p>
+      <img :src="alta.qr" alt="Código QR para la aplicación autenticadora" class="mx-auto size-48 rounded-lg border border-slate-200" />
+      <details class="text-xs text-slate-500">
+        <summary class="cursor-pointer">¿No puede escanear? Ingrese la clave manualmente</summary>
+        <code class="mt-1 block rounded bg-slate-100 p-2 break-all">{{ alta.secreto }}</code>
+      </details>
+      <CampoCodigo v-model="codigo" />
+      <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
+      <button class="btn-primario min-h-12 w-full text-base" :disabled="enviando">Activar y entrar</button>
+    </form>
 
-        <div v-else class="space-y-4">
-          <CodigosRecuperacion :codigos="codigos" />
-          <button class="btn w-full bg-slate-900 text-white hover:bg-slate-800" @click="continuar">Ya los guardé, continuar</button>
-        </div>
-      </div>
-      <p class="mt-4 text-center text-sm"><RouterLink to="/login" class="text-slate-400 hover:text-white">¿Es usuario de un estudio? Ingrese aquí</RouterLink></p>
+    <div v-else class="space-y-4">
+      <CodigosRecuperacion :codigos="codigos" />
+      <button class="btn-primario min-h-12 w-full text-base" @click="continuar">Ya los guardé, continuar</button>
     </div>
-  </div>
+
+    <template #pie>
+      <button v-if="['verificar', 'configurar'].includes(paso)" class="text-slate-500 hover:underline" @click="reiniciar">Volver a ingresar</button>
+      <RouterLink v-else-if="paso === 'credenciales'" to="/login" class="text-slate-500 hover:text-slate-700 hover:underline">¿Es usuario de un estudio? Ingrese aquí</RouterLink>
+    </template>
+  </TarjetaAuth>
 </template>

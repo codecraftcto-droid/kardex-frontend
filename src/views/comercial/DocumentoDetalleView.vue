@@ -118,7 +118,7 @@ const anular = () =>
       </dl>
     </section>
 
-    <TablaResponsiva :columnas="columnas" :filas="d.detalles">
+    <TablaResponsiva selector :columnas="columnas" :filas="d.detalles">
       <template #celda-producto.nombre="{ fila }">
         <span class="font-medium">{{ fila.producto.nombre }}</span>
         <p class="font-mono text-xs text-slate-400">{{ fila.producto.sku }}</p>

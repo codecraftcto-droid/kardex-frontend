@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { api, mensajeError } from '@/services/api';
 import { useExportaciones } from '@/stores/exportaciones';
 import { useAuth } from '@/stores/auth';
@@ -10,6 +11,8 @@ import { cant, fecha, fechaHora, num } from '@/utils/formato';
 import { ESTADOS_TRANSFERENCIA } from '@/utils/kardex';
 import EncabezadoPagina from '@/components/EncabezadoPagina.vue';
 import TablaResponsiva from '@/components/TablaResponsiva.vue';
+import Paginacion from '@/components/Paginacion.vue';
+import { usePaginacionLocal } from '@/composables/usePaginacionLocal';
 import Icono from '@/components/Icono.vue';
 
 const auth = useAuth();
@@ -27,14 +30,19 @@ const REPORTES = [
   { id: 'movimientos', titulo: 'Movimientos', descripcion: 'Entradas y salidas en un rango de fechas', icono: 'movimientos', permisos: ['reporte.movimientos.ver'] },
   { id: 'valorizacion', titulo: 'Valorización', descripcion: 'Valor del inventario a una fecha de corte', icono: 'kardex', permisos: ['reporte.valorizacion.ver', 'kardex.costos.ver'] },
   { id: 'transferencias', titulo: 'Transferencias', descripcion: 'Traslados entre almacenes y faltantes', icono: 'transferencias', permisos: ['transferencia.ver'] },
+  { id: 'ventas', titulo: 'Registro de ventas', descripcion: 'Comprobantes del periodo (formato 14.1)', icono: 'comprobante', permisos: ['reporte.ventas.ver'] },
+  { id: 'caja', titulo: 'Turnos de caja', descripcion: 'Arqueos por caja y medio de pago', icono: 'caja', permisos: ['reporte.ventas.ver'] },
+  { id: 'cxc', titulo: 'Cuentas por cobrar', descripcion: 'Saldos de clientes por antigüedad (al día de hoy)', icono: 'tarjeta', permisos: ['reporte.cxc.ver'] },
+  { id: 'cobranzas', titulo: 'Cobranzas', descripcion: 'Pagos recibidos de ventas al crédito', icono: 'tarjeta', permisos: ['reporte.cxc.ver'] },
 ];
 const disponibles = computed(() => REPORTES.filter((r) => r.permisos.every((p) => auth.canEnEmpresa(p, empresaId.value))));
-const actual = ref(null);
+const route = useRoute();
+const actual = ref(route.query.tipo || null);
 watch(disponibles, (l) => { if (!l.some((r) => r.id === actual.value)) actual.value = l[0]?.id ?? null; }, { immediate: true });
 
 const filtros = reactive({
   nivel: 'almacen', sedeId: '', almacenId: '', categoriaId: '', incluirCeros: false,
-  desde: inicioMes(), hasta: hoy(), corte: hoy(), tipo: '', estado: '',
+  desde: inicioMes(), hasta: hoy(), corte: hoy(), tipo: '', estado: '', incluirNotasVenta: false, soloVencidos: false,
 });
 const sedes = ref([]);
 const categorias = ref([]);
@@ -58,6 +66,10 @@ function parametros() {
     movimientos: () => opc({ ...comunes, desde: f.desde, hasta: `${f.hasta}T23:59:59`, almacenId: f.almacenId, tipo: f.tipo }),
     valorizacion: () => opc({ ...comunes, corte: `${f.corte}T23:59:59`, sedeId: f.sedeId, almacenId: f.almacenId }),
     transferencias: () => opc({ ...comunes, desde: f.desde, hasta: `${f.hasta}T23:59:59`, estado: f.estado, almacenId: f.almacenId }),
+    ventas: () => opc({ ...comunes, desde: f.desde, hasta: `${f.hasta}T23:59:59`, incluirNotasVenta: f.incluirNotasVenta ? 'true' : '' }),
+    caja: () => opc({ ...comunes, desde: f.desde, hasta: `${f.hasta}T23:59:59` }),
+    cxc: () => opc({ ...comunes, soloVencidos: f.soloVencidos ? 'true' : '' }),
+    cobranzas: () => opc({ ...comunes, desde: f.desde, hasta: `${f.hasta}T23:59:59` }),
   }[actual.value]();
 }
 
@@ -79,6 +91,7 @@ watch(actual, () => (resultado.value = null));
 const puedeExportar = computed(() => auth.canEnEmpresa('reporte.exportar', empresaId.value));
 // Exportación en segundo plano: el reporte completo (sin límite de filas en Excel)
 const exportaciones = useExportaciones();
+const { pag: pagExport, visibles: exportacionesVisibles } = usePaginacionLocal(computed(() => exportaciones.lista), 10);
 onMounted(() => exportaciones.cargar());
 const exportando = ref('');
 async function exportar(formato) {
@@ -110,13 +123,16 @@ const filas = computed(() =>
     ...Object.fromEntries(resultado.value.columnas.map((c) => [c.clave, formatear(f[c.clave], c.tipo)])),
   })),
 );
+// La vista previa (hasta 500 filas) se pagina en el navegador
+const { pag: pagFilas, visibles: filasPagina } = usePaginacionLocal(filas, 20);
+
 const totales = computed(() => {
   const t = resultado.value?.totales;
   if (!t) return [];
   return resultado.value.columnas.filter((c) => t[c.clave] != null).map((c) => ({ titulo: c.titulo, valor: formatear(t[c.clave], c.tipo) }));
 });
 const muestraSede = computed(() => (actual.value === 'stock' && filtros.nivel !== 'empresa') || actual.value === 'valorizacion');
-const muestraAlmacen = computed(() => actual.value !== 'stock' || filtros.nivel === 'almacen');
+const muestraAlmacen = computed(() => !['ventas', 'caja', 'cxc', 'cobranzas'].includes(actual.value) && (actual.value !== 'stock' || filtros.nivel === 'almacen'));
 </script>
 
 <template>
@@ -150,7 +166,7 @@ const muestraAlmacen = computed(() => actual.value !== 'stock' || filtros.nivel 
           <option value="empresa">Consolidado de la empresa</option>
         </select>
       </div>
-      <template v-if="['movimientos', 'transferencias'].includes(actual)">
+      <template v-if="['movimientos', 'transferencias', 'ventas', 'caja', 'cobranzas'].includes(actual)">
         <div><label class="etiqueta">Desde</label><input v-model="filtros.desde" type="date" class="input" required /></div>
         <div><label class="etiqueta">Hasta</label><input v-model="filtros.hasta" type="date" class="input" required /></div>
       </template>
@@ -191,6 +207,12 @@ const muestraAlmacen = computed(() => actual.value !== 'stock' || filtros.nivel 
           <option v-for="(e, k) in ESTADOS_TRANSFERENCIA" :key="k" :value="k">{{ e.texto }}</option>
         </select>
       </div>
+      <label v-if="actual === 'ventas'" class="flex min-h-11 items-center gap-2 self-end text-sm">
+        <input v-model="filtros.incluirNotasVenta" type="checkbox" class="size-5 accent-marca-700" /> Incluir notas de venta (internas)
+      </label>
+      <label v-if="actual === 'cxc'" class="flex min-h-11 items-center gap-2 self-end text-sm">
+        <input v-model="filtros.soloVencidos" type="checkbox" class="size-5 accent-marca-700" /> Solo documentos con cuotas vencidas
+      </label>
       <label v-if="actual === 'stock'" class="flex min-h-11 items-center gap-2 self-end text-sm">
         <input v-model="filtros.incluirCeros" type="checkbox" class="size-5 accent-marca-700" /> Incluir productos sin stock
       </label>
@@ -222,7 +244,8 @@ const muestraAlmacen = computed(() => actual.value !== 'stock' || filtros.nivel 
           <p class="text-lg font-semibold tabular-nums">{{ t.valor }}</p>
         </div>
       </div>
-      <TablaResponsiva :columnas="columnas" :filas="filas" clave-fila="_id" vacio="Sin datos para los filtros seleccionados" />
+      <TablaResponsiva selector :columnas="columnas" :filas="filasPagina" clave-fila="_id" :clave-columnas="`reporte-${actual}`" vacio="Sin datos para los filtros seleccionados" />
+      <Paginacion :pag="pagFilas" />
       <p v-if="resultado.hayMas" class="rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-800">
         Vista previa de las primeras {{ VISTA_PREVIA }} filas{{ resultado.total ? ` de ${resultado.total.toLocaleString('es-PE')}` : '' }}.
         Exporte a Excel para obtener el reporte completo con sus totales; se genera en segundo plano.
@@ -236,7 +259,7 @@ const muestraAlmacen = computed(() => actual.value !== 'stock' || filtros.nivel 
         <span class="text-xs text-slate-500">Los archivos se conservan 24 horas</span>
       </div>
       <ul class="divide-y divide-slate-100">
-        <li v-for="x in exportaciones.lista" :key="x.id" class="flex flex-wrap items-center justify-between gap-3 py-3">
+        <li v-for="x in exportacionesVisibles" :key="x.id" class="flex flex-wrap items-center justify-between gap-3 py-3">
           <div class="min-w-0 flex-1">
             <p class="truncate text-sm font-medium">
               {{ x.titulo || REPORTES.find((r) => r.id === x.tipo)?.titulo || x.tipo }}
@@ -256,6 +279,7 @@ const muestraAlmacen = computed(() => actual.value !== 'stock' || filtros.nivel 
           <button v-if="x.estado === 'LISTO'" class="btn-secundario" @click="exportaciones.bajar(x)"><Icono nombre="descargar" clase="size-4" /> Descargar</button>
         </li>
       </ul>
+      <Paginacion :pag="pagExport" :opciones="[10, 20, 50]" />
     </section>
   </template>
 </template>

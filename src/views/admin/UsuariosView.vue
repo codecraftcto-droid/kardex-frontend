@@ -11,6 +11,8 @@ import Paginacion from '@/components/Paginacion.vue';
 import CampoBusqueda from '@/components/CampoBusqueda.vue';
 import BaseModal from '@/components/BaseModal.vue';
 import Icono from '@/components/Icono.vue';
+import MenuAcciones from '@/components/MenuAcciones.vue';
+import BotonColumnas from '@/components/BotonColumnas.vue';
 
 const router = useRouter();
 const contexto = useContexto();
@@ -33,7 +35,7 @@ const modal = reactive({ abierto: false, guardando: false, form: vacio() });
 async function invitar() {
   modal.guardando = true;
   try {
-    const datos = { ...modal.form, empresaId: modal.form.tipo === 'cliente' ? modal.form.empresaId : null };
+    const datos = { ...modal.form, empresaId: modal.form.tipo === 'interno' ? null : modal.form.empresaId };
     const { data } = await api.post('/usuarios', datos);
     toast.exito(`Invitación enviada a ${data.email}`);
     modal.abierto = false;
@@ -44,6 +46,9 @@ async function invitar() {
     modal.guardando = false;
   }
 }
+
+/** Acciones de cada usuario (menú ⋯) */
+const accionesFila = (f) => [{ texto: 'Ver detalle, roles y sesiones', icono: 'perfil', to: `/usuarios/${f.id}` }];
 </script>
 
 <template>
@@ -53,7 +58,7 @@ async function invitar() {
     </button>
   </EncabezadoPagina>
 
-  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_12rem_12rem]">
+  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_12rem_12rem] md:grid-cols-[1fr_12rem_12rem_auto]">
     <CampoBusqueda v-model="filtros.q" placeholder="Nombre, correo o documento" />
     <select v-model="filtros.estado" class="input">
       <option value="">Todos los estados</option>
@@ -65,7 +70,9 @@ async function invitar() {
       <option value="">Todos los tipos</option>
       <option value="interno">Internos</option>
       <option value="cliente">Clientes</option>
+      <option value="operador">Operadores de caja</option>
     </select>
+    <BotonColumnas :columnas="columnas" />
   </div>
 
   <TablaResponsiva :columnas="columnas" :filas="filas" :cargando="cargando" vacio="No hay usuarios">
@@ -73,11 +80,9 @@ async function invitar() {
       <RouterLink :to="`/usuarios/${fila.id}`" class="font-medium text-marca-700 hover:underline">{{ fila.nombres }}</RouterLink>
       <p v-if="fila.cargo" class="text-xs text-slate-500">{{ fila.cargo }}</p>
     </template>
-    <template #celda-tipo="{ fila }">{{ fila.tipo === 'cliente' ? `Cliente · ${fila.empresa?.razonSocial ?? ''}` : 'Interno' }}</template>
+    <template #celda-tipo="{ fila }">{{ fila.tipo === 'interno' ? 'Interno' : `${fila.tipo === 'cliente' ? 'Cliente' : 'Operador'} · ${fila.empresa?.razonSocial ?? ''}` }}</template>
     <template #celda-estado="{ fila }"><span class="insignia capitalize" :class="estiloEstado[fila.estado]">{{ fila.estado }}</span></template>
-    <template #acciones="{ fila }">
-      <RouterLink :to="`/usuarios/${fila.id}`" class="btn-texto">Ver detalle</RouterLink>
-    </template>
+    <template #acciones="{ fila }"><MenuAcciones :acciones="accionesFila(fila)" :etiqueta="`Acciones de ${fila.nombres}`" /></template>
   </TablaResponsiva>
   <Paginacion :pag="pag" />
 
@@ -108,9 +113,10 @@ async function invitar() {
         <select id="tipo" v-model="modal.form.tipo" class="input">
           <option value="interno">Interno (personal del estudio)</option>
           <option value="cliente">Cliente (portal, solo lectura)</option>
+          <option value="operador">Operador de caja (empleado de la empresa)</option>
         </select>
       </div>
-      <div v-if="modal.form.tipo === 'cliente'">
+      <div v-if="modal.form.tipo !== 'interno'">
         <label class="etiqueta" for="emp">Empresa *</label>
         <select id="emp" v-model="modal.form.empresaId" class="input" required>
           <option v-for="e in contexto.empresas" :key="e.id" :value="e.id">{{ e.razonSocial }}</option>

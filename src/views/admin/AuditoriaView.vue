@@ -9,6 +9,8 @@ import TablaResponsiva from '@/components/TablaResponsiva.vue';
 import Paginacion from '@/components/Paginacion.vue';
 import BaseModal from '@/components/BaseModal.vue';
 import Icono from '@/components/Icono.vue';
+import MenuAcciones from '@/components/MenuAcciones.vue';
+import BotonColumnas from '@/components/BotonColumnas.vue';
 
 const contexto = useContexto();
 const toast = useToast();
@@ -40,6 +42,9 @@ async function exportar() {
     toast.error(mensajeError(e, 'No se pudo exportar'));
   }
 }
+
+/** Acciones de cada registro (menú ⋯) */
+const accionesFila = (f) => [{ texto: 'Ver detalle del cambio', icono: 'auditoria', alHacer: () => (detalle.value = f) }];
 </script>
 
 <template>
@@ -47,7 +52,7 @@ async function exportar() {
     <button v-can="'auditoria.exportar'" class="btn-secundario" @click="exportar"><Icono nombre="descargar" /> Exportar CSV</button>
   </EncabezadoPagina>
 
-  <div class="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+  <div class="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[repeat(5,minmax(0,1fr))_auto]">
     <select v-model="filtros.modulo" class="input">
       <option value="">Todos los módulos</option>
       <option v-for="m in modulos" :key="m" :value="m">{{ m }}</option>
@@ -59,13 +64,14 @@ async function exportar() {
     </select>
     <label class="flex items-center gap-2"><span class="text-sm text-slate-500">Desde</span><input v-model="filtros.desde" type="date" class="input" /></label>
     <label class="flex items-center gap-2"><span class="text-sm text-slate-500">Hasta</span><input v-model="filtros.hasta" type="date" class="input" /></label>
+    <BotonColumnas :columnas="columnas" />
   </div>
 
   <TablaResponsiva :columnas="columnas" :filas="filas" :cargando="cargando" vacio="Sin registros para estos filtros">
     <template #celda-accion="{ fila }"><code class="text-sm">{{ fila.accion }}</code></template>
     <template #celda-fecha="{ fila }"><span class="whitespace-nowrap">{{ fecha(fila.fecha) }}</span></template>
     <template #celda-usuario.nombres="{ fila }">{{ fila.usuario?.nombres ?? 'Sistema' }}</template>
-    <template #acciones="{ fila }"><button class="btn-texto" @click="detalle = fila">Detalle</button></template>
+    <template #acciones="{ fila }"><MenuAcciones :acciones="accionesFila(fila)" :etiqueta="'Acciones del registro'" /></template>
   </TablaResponsiva>
   <Paginacion :pag="pag" />
 

@@ -1,16 +1,29 @@
 <script setup>
+import { useRoute } from 'vue-router';
+import { useColumnasVisibles } from '@/composables/useColumnasVisibles';
+import BotonColumnas from './BotonColumnas.vue';
+
 /**
  * Tabla en escritorio y tarjetas en móvil. Nunca genera scroll horizontal de la página:
  * en tablet el scroll queda contenido en el propio contenedor.
  * Slots: `celda-<clave>` ({ fila }) y `acciones` ({ fila }).
+ * Las columnas que el usuario ocultó con el botón "Columnas" (BotonColumnas, en la barra de
+ * filtros) no se muestran en escritorio; ambos comparten la clave (por defecto, el nombre de la ruta).
  */
-defineProps({
+const props = defineProps({
   columnas: { type: Array, required: true }, // [{ clave, titulo, clase?, ocultarEnTarjeta? }]
   filas: { type: Array, default: () => [] },
   cargando: Boolean,
   vacio: { type: String, default: 'No hay registros' },
   claveFila: { type: String, default: 'id' },
+  tituloAcciones: { type: String, default: 'Acciones' },
+  claveColumnas: { type: String, default: null },
+  /** Muestra el botón "Columnas" sobre la tabla (para pantallas sin barra de filtros) */
+  selector: Boolean,
 });
+const route = useRoute();
+const cols = useColumnasVisibles(() => props.claveColumnas ?? String(route.name ?? 'tabla'), () => props.columnas);
+const columnasTabla = () => cols.visibles.value;
 const valor = (fila, clave) => clave.split('.').reduce((o, k) => o?.[k], fila);
 </script>
 
@@ -40,21 +53,24 @@ const valor = (fila, clave) => clave.split('.').reduce((o, k) => o?.[k], fila);
         </li>
       </ul>
 
+      <div v-if="selector && columnas.length > 2" class="mb-2 hidden justify-end md:flex">
+        <BotonColumnas :columnas="columnas" :clave="claveColumnas" />
+      </div>
       <!-- Tablet/escritorio: tabla con scroll contenido. "relative" contiene también los
            elementos absolutos (p. ej. textos sr-only), que si no ensancharían la página -->
       <div class="tarjeta relative hidden overflow-x-auto md:block" :class="{ 'opacity-60': cargando }">
         <table class="min-w-full divide-y divide-slate-200 text-sm">
-          <thead class="bg-slate-50">
+          <thead class="bg-slate-50/80">
             <tr>
-              <th v-for="c in columnas" :key="c.clave" class="px-4 py-3 text-left font-medium whitespace-nowrap text-slate-600" :class="c.clase">
+              <th v-for="c in columnasTabla()" :key="c.clave" class="px-4 py-3 text-left text-xs font-semibold tracking-wide whitespace-nowrap text-slate-500 uppercase" :class="c.clase">
                 {{ c.titulo }}
               </th>
-              <th v-if="$slots.acciones" class="px-4 py-3"><span class="sr-only">Acciones</span></th>
+              <th v-if="$slots.acciones" class="px-4 py-3 text-right text-xs font-semibold tracking-wide whitespace-nowrap text-slate-500 uppercase">{{ tituloAcciones }}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100">
-            <tr v-for="fila in filas" :key="fila[claveFila]" class="hover:bg-slate-50">
-              <td v-for="c in columnas" :key="c.clave" class="px-4 py-3 align-middle" :class="c.clase">
+            <tr v-for="fila in filas" :key="fila[claveFila]" class="transition-colors hover:bg-slate-50/70">
+              <td v-for="c in columnasTabla()" :key="c.clave" class="px-4 py-3 align-middle" :class="c.clase">
                 <slot :name="`celda-${c.clave}`" :fila="fila">{{ valor(fila, c.clave) ?? '—' }}</slot>
               </td>
               <td v-if="$slots.acciones" class="px-4 py-2 text-right whitespace-nowrap">

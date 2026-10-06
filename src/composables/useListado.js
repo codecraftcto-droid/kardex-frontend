@@ -36,7 +36,7 @@ export function useListado(url, filtrosIniciales = {}, cliente = api) {
       }, 300);
     },
   );
-  watch(() => pag.pagina, cargar);
+  watch(() => [pag.pagina, pag.porPagina], cargar);
 
   const extra = ref(null);
   return { filas, cargando, filtros, pag, cargar, extra };

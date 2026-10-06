@@ -13,6 +13,8 @@ import CampoBusqueda from '@/components/CampoBusqueda.vue';
 import BaseModal from '@/components/BaseModal.vue';
 import InsigniaEstado from '@/components/InsigniaEstado.vue';
 import Icono from '@/components/Icono.vue';
+import MenuAcciones from '@/components/MenuAcciones.vue';
+import BotonColumnas from '@/components/BotonColumnas.vue';
 
 const auth = useAuth();
 const contexto = useContexto();
@@ -79,6 +81,13 @@ async function eliminar(fila) {
     toast.error(mensajeError(e));
   }
 }
+
+/** Acciones de cada fila (menú ⋯), solo las permitidas sobre ese registro */
+const accionesFila = (f) => [
+  auth.can('sedes.sede.editar', { empresaId: f.empresaId, sedeId: f.id }) && { texto: 'Editar', icono: 'editar', alHacer: () => abrir(f) },
+  auth.can('sedes.sede.eliminar', { empresaId: f.empresaId, sedeId: f.id }) && { separador: true },
+  auth.can('sedes.sede.eliminar', { empresaId: f.empresaId, sedeId: f.id }) && { texto: 'Eliminar', icono: 'eliminar', peligro: true, alHacer: () => eliminar(f) },
+];
 </script>
 
 <template>
@@ -88,18 +97,11 @@ async function eliminar(fila) {
     </button>
   </EncabezadoPagina>
 
-  <div class="mb-4"><CampoBusqueda v-model="filtros.q" placeholder="Buscar sede" /></div>
+  <div class="mb-4 flex gap-2"><div class="min-w-0 flex-1"><CampoBusqueda v-model="filtros.q" placeholder="Buscar sede" /></div><BotonColumnas :columnas="columnas" /></div>
 
   <TablaResponsiva :columnas="columnas" :filas="filas" :cargando="cargando" vacio="No hay sedes en esta empresa">
     <template #celda-activo="{ fila }"><InsigniaEstado :activo="fila.activo" textoSi="Activa" textoNo="Inactiva" /></template>
-    <template #acciones="{ fila }">
-      <button v-can="{ permiso: 'sedes.sede.editar', recurso: { empresaId: fila.empresaId, sedeId: fila.id } }" class="btn-texto" @click="abrir(fila)">
-        <Icono nombre="editar" clase="size-4" /> Editar
-      </button>
-      <button v-can="{ permiso: 'sedes.sede.eliminar', recurso: { empresaId: fila.empresaId, sedeId: fila.id } }" class="btn-texto text-red-600 hover:bg-red-50" @click="eliminar(fila)">
-        <Icono nombre="eliminar" clase="size-4" /> Eliminar
-      </button>
-    </template>
+    <template #acciones="{ fila }"><MenuAcciones :acciones="accionesFila(fila)" :etiqueta="`Acciones de ${fila.razonSocial ?? fila.nombre}`" /></template>
   </TablaResponsiva>
   <Paginacion :pag="pag" />
 

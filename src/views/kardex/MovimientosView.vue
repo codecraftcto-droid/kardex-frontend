@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, watch } from 'vue';
+import { onMounted, reactive, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuth } from '@/stores/auth';
 import { useContexto } from '@/stores/contexto';
@@ -13,6 +13,9 @@ import TablaResponsiva from '@/components/TablaResponsiva.vue';
 import Paginacion from '@/components/Paginacion.vue';
 import CampoBusqueda from '@/components/CampoBusqueda.vue';
 import Icono from '@/components/Icono.vue';
+import MenuAcciones from '@/components/MenuAcciones.vue';
+import ModalMovimiento from '@/components/ModalMovimiento.vue';
+import BotonColumnas from '@/components/BotonColumnas.vue';
 
 const router = useRouter();
 const auth = useAuth();
@@ -35,6 +38,11 @@ const columnas = [
   { clave: 'usuario.nombres', titulo: 'Registró', ocultarEnTarjeta: true },
 ];
 const documento = (m) => (m.documentoNumero ? `${m.documentoTipo ?? ''} ${m.documentoSerie ?? ''}-${m.documentoNumero}`.trim() : '—');
+
+/** Acciones de cada movimiento (menú ⋯) */
+const detalle = reactive({ abierto: false, id: null });
+const verDetalle = (f) => Object.assign(detalle, { abierto: true, id: f.id });
+const accionesFila = (f) => [{ texto: `Ver detalle (${f._count.detalles} producto${f._count.detalles === 1 ? '' : 's'})`, icono: 'movimientos', alHacer: () => verDetalle(f) }];
 </script>
 
 <template>
@@ -47,7 +55,7 @@ const documento = (m) => (m.documentoNumero ? `${m.documentoTipo ?? ''} ${m.docu
     </RouterLink>
   </EncabezadoPagina>
 
-  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_16rem_12rem]">
+  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_16rem_12rem] md:grid-cols-[1fr_16rem_12rem_auto]">
     <CampoBusqueda v-model="filtros.q" placeholder="Número o documento" />
     <select v-model="filtros.almacenId" class="input">
       <option value="">Todos los almacenes</option>
@@ -58,11 +66,12 @@ const documento = (m) => (m.documentoNumero ? `${m.documentoTipo ?? ''} ${m.docu
       <option value="ENTRADA">Solo entradas</option>
       <option value="SALIDA">Solo salidas</option>
     </select>
+    <BotonColumnas :columnas="columnas" />
   </div>
 
   <TablaResponsiva :columnas="columnas" :filas="filas" :cargando="cargando" vacio="No hay movimientos">
     <template #celda-numero="{ fila }">
-      <RouterLink :to="`/movimientos/${fila.id}`" class="font-mono font-medium text-marca-700 hover:underline">{{ fila.numero }}</RouterLink>
+      <button class="font-mono font-medium text-marca-700 hover:underline" @click="verDetalle(fila)">{{ fila.numero }}</button>
       <span v-if="fila.anuladoPor" class="insignia ml-2 bg-red-50 text-red-700">Anulado</span>
     </template>
     <template #celda-fecha="{ fila }"><span class="whitespace-nowrap">{{ fechaHora(fila.fecha) }}</span></template>
@@ -73,9 +82,9 @@ const documento = (m) => (m.documentoNumero ? `${m.documentoTipo ?? ''} ${m.docu
     </template>
     <template #celda-almacen.nombre="{ fila }">{{ fila.almacen.codigo }} — {{ fila.almacen.nombre }}</template>
     <template #celda-documento="{ fila }"><span class="whitespace-nowrap">{{ documento(fila) }}</span></template>
-    <template #acciones="{ fila }">
-      <button class="btn-texto" @click="router.push(`/movimientos/${fila.id}`)">Ver ({{ fila._count.detalles }})</button>
-    </template>
+    <template #acciones="{ fila }"><MenuAcciones :acciones="accionesFila(fila)" :etiqueta="`Acciones del movimiento ${fila.numero}`" /></template>
   </TablaResponsiva>
   <Paginacion :pag="pag" />
+
+  <ModalMovimiento :abierto="detalle.abierto" :movimiento-id="detalle.id" @cerrar="detalle.abierto = false" @cambio="cargar" />
 </template>

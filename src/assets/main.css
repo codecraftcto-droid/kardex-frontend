@@ -22,7 +22,7 @@
     placeholder:text-slate-400 focus:border-marca-600 focus:ring-2 focus:ring-marca-100 focus:outline-none disabled:bg-slate-100;
 }
 @utility etiqueta { @apply mb-1 block text-sm font-medium text-slate-700; }
-@utility tarjeta { @apply rounded-xl border border-slate-200 bg-white shadow-sm; }
+@utility tarjeta { @apply rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]; }
 @utility insignia { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium; }
 
 /* Espacio para la barra inferior en móvil, respetando el notch */

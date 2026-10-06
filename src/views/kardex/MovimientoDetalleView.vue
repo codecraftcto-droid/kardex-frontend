@@ -47,6 +47,7 @@ const puedeAnular = computed(
     m.value &&
     m.value.motivo !== 'ANULACION' &&
     !m.value.documentoComercial &&
+    !m.value.comprobante &&
     !m.value.transferencia &&
     !m.value.anuladoPor &&
     auth.can('kardex.movimiento.anular', { empresaId: m.value.empresaId, sedeId: m.value.sedeId, almacenId: m.value.almacenId }),
@@ -87,6 +88,11 @@ async function anular() {
       <RouterLink :to="`/${m.documentoComercial.tipo === 'COMPRA' ? 'compras' : 'ventas'}/${m.documentoComercial.id}`" class="font-medium underline">
         {{ m.documentoComercial.serie }}-{{ m.documentoComercial.numero }}</RouterLink>; para revertirlo, anule el documento.
     </p>
+    <p v-if="m.comprobante" class="rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-800">
+      Generado por {{ m.comprobante.tipo === 'NOTA_CREDITO' ? 'la nota de crédito' : 'el comprobante' }}
+      <RouterLink :to="`/comprobantes/${m.comprobante.id}`" class="font-mono font-medium underline">{{ m.comprobante.serie }}-{{ String(m.comprobante.numero).padStart(8, '0') }}</RouterLink>
+      de la caja; para revertirlo, anule el comprobante (en su turno) o emita una nota de crédito.
+    </p>
     <p v-if="m.transferencia" class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
       Movimiento de la transferencia
       <RouterLink :to="`/transferencias/${m.transferencia.id}`" class="font-medium underline">{{ m.transferencia.numero }}</RouterLink>.
@@ -109,7 +115,7 @@ async function anular() {
       </dl>
     </section>
 
-    <TablaResponsiva :columnas="columnas" :filas="m.detalles">
+    <TablaResponsiva selector :columnas="columnas" :filas="m.detalles">
       <template #celda-producto.nombre="{ fila }">
         <RouterLink :to="{ name: 'kardex', query: { productoId: fila.producto.id, almacenId: m.almacenId } }" class="font-medium text-marca-700 hover:underline">
           {{ fila.producto.nombre }}

@@ -13,6 +13,8 @@ import Paginacion from '@/components/Paginacion.vue';
 import CampoBusqueda from '@/components/CampoBusqueda.vue';
 import BaseModal from '@/components/BaseModal.vue';
 import Icono from '@/components/Icono.vue';
+import MenuAcciones from '@/components/MenuAcciones.vue';
+import BotonColumnas from '@/components/BotonColumnas.vue';
 
 const router = useRouter();
 const plataforma = usePlataforma();
@@ -49,6 +51,9 @@ async function crear() {
     modal.guardando = false;
   }
 }
+
+/** Acciones de cada estudio (menú ⋯) */
+const accionesFila = (f) => [{ texto: 'Ver estudio', icono: 'empresa', to: `/plataforma/estudios/${f.id}` }];
 </script>
 
 <template>
@@ -58,7 +63,7 @@ async function crear() {
     </button>
   </EncabezadoPagina>
 
-  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_12rem_12rem]">
+  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_12rem_12rem] md:grid-cols-[1fr_12rem_12rem_auto]">
     <CampoBusqueda v-model="filtros.q" placeholder="Nombre, RUC o correo" />
     <select v-model="filtros.estado" class="input">
       <option value="">Todos los estados</option>
@@ -69,6 +74,7 @@ async function crear() {
       <option value="">Todos los planes</option>
       <option v-for="p in planes" :key="p.id" :value="p.id">{{ p.nombre }}</option>
     </select>
+    <BotonColumnas :columnas="columnas" />
   </div>
 
   <TablaResponsiva :columnas="columnas" :filas="filas" :cargando="cargando" vacio="No hay estudios">
@@ -83,7 +89,7 @@ async function crear() {
     <template #celda-uso="{ fila }"><span class="tabular-nums">{{ fila._count.empresas }} / {{ fila._count.usuarios }} / {{ fila.almacenes }}</span></template>
     <template #celda-movimientos30d="{ fila }"><span class="tabular-nums">{{ fila.movimientos30d }}</span></template>
     <template #celda-ultimoAcceso="{ fila }"><span class="whitespace-nowrap">{{ fechaHora(fila.ultimoAcceso) }}</span></template>
-    <template #acciones="{ fila }"><RouterLink :to="`/plataforma/estudios/${fila.id}`" class="btn-texto text-slate-700">Ver</RouterLink></template>
+    <template #acciones="{ fila }"><MenuAcciones :acciones="accionesFila(fila)" :etiqueta="`Acciones de ${fila.nombre}`" /></template>
   </TablaResponsiva>
   <Paginacion :pag="pag" />
 

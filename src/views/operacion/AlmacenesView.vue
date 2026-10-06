@@ -13,6 +13,8 @@ import CampoBusqueda from '@/components/CampoBusqueda.vue';
 import BaseModal from '@/components/BaseModal.vue';
 import InsigniaEstado from '@/components/InsigniaEstado.vue';
 import Icono from '@/components/Icono.vue';
+import MenuAcciones from '@/components/MenuAcciones.vue';
+import BotonColumnas from '@/components/BotonColumnas.vue';
 
 const auth = useAuth();
 const contexto = useContexto();
@@ -83,6 +85,13 @@ async function eliminar(fila) {
     toast.error(mensajeError(e));
   }
 }
+
+/** Acciones de cada fila (menú ⋯), solo las permitidas sobre ese registro */
+const accionesFila = (f) => [
+  auth.can('almacenes.almacen.editar', { empresaId: f.empresaId, sedeId: f.sedeId, almacenId: f.id }) && { texto: 'Editar', icono: 'editar', alHacer: () => abrir(f) },
+  auth.can('almacenes.almacen.eliminar', { empresaId: f.empresaId, sedeId: f.sedeId, almacenId: f.id }) && { separador: true },
+  auth.can('almacenes.almacen.eliminar', { empresaId: f.empresaId, sedeId: f.sedeId, almacenId: f.id }) && { texto: 'Eliminar', icono: 'eliminar', peligro: true, alHacer: () => eliminar(f) },
+];
 </script>
 
 <template>
@@ -90,25 +99,19 @@ async function eliminar(fila) {
     <button v-if="sedesCreables().length" class="btn-primario" @click="abrir()"><Icono nombre="agregar" /> Nuevo almacén</button>
   </EncabezadoPagina>
 
-  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_14rem]">
+  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_14rem] md:grid-cols-[1fr_14rem_auto]">
     <CampoBusqueda v-model="filtros.q" placeholder="Buscar por nombre o código" />
     <select v-if="sedes.length" v-model="filtros.sedeId" class="input">
       <option value="">Todas las sedes</option>
       <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
     </select>
+    <BotonColumnas :columnas="columnas" />
   </div>
 
   <TablaResponsiva :columnas="columnas" :filas="filas" :cargando="cargando" vacio="No hay almacenes visibles">
     <template #celda-codigo="{ fila }"><span class="font-mono text-xs">{{ fila.codigo }}</span></template>
     <template #celda-activo="{ fila }"><InsigniaEstado :activo="fila.activo" /></template>
-    <template #acciones="{ fila }">
-      <button v-can="{ permiso: 'almacenes.almacen.editar', recurso: { empresaId: fila.empresaId, sedeId: fila.sedeId, almacenId: fila.id } }" class="btn-texto" @click="abrir(fila)">
-        <Icono nombre="editar" clase="size-4" /> Editar
-      </button>
-      <button v-can="{ permiso: 'almacenes.almacen.eliminar', recurso: { empresaId: fila.empresaId, sedeId: fila.sedeId, almacenId: fila.id } }" class="btn-texto text-red-600 hover:bg-red-50" @click="eliminar(fila)">
-        <Icono nombre="eliminar" clase="size-4" /> Eliminar
-      </button>
-    </template>
+    <template #acciones="{ fila }"><MenuAcciones :acciones="accionesFila(fila)" :etiqueta="`Acciones de ${fila.razonSocial ?? fila.nombre}`" /></template>
   </TablaResponsiva>
   <Paginacion :pag="pag" />
 

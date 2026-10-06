@@ -27,10 +27,10 @@ async function enviar() {
     <form v-else class="space-y-4" @submit.prevent="enviar">
       <div>
         <label class="etiqueta" for="email">Correo electrónico</label>
-        <input id="email" v-model="email" type="email" class="input" required autofocus />
+        <input id="email" v-model="email" type="email" class="input min-h-12" placeholder="usted@estudio.pe" required autofocus />
       </div>
       <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
-      <button class="btn-primario w-full" :disabled="enviando">Enviar enlace</button>
+      <button class="btn-primario min-h-12 w-full text-base" :disabled="enviando">Enviar enlace</button>
     </form>
     <template #pie><RouterLink to="/login" class="text-marca-700 hover:underline">Volver a ingresar</RouterLink></template>
   </TarjetaAuth>

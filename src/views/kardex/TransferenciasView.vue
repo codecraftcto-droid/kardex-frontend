@@ -12,6 +12,8 @@ import TablaResponsiva from '@/components/TablaResponsiva.vue';
 import Paginacion from '@/components/Paginacion.vue';
 import CampoBusqueda from '@/components/CampoBusqueda.vue';
 import Icono from '@/components/Icono.vue';
+import MenuAcciones from '@/components/MenuAcciones.vue';
+import BotonColumnas from '@/components/BotonColumnas.vue';
 
 const auth = useAuth();
 const contexto = useContexto();
@@ -43,6 +45,9 @@ const columnas = [
   { clave: 'solicitadoPor.nombres', titulo: 'Solicitó', ocultarEnTarjeta: true },
 ];
 const pendienteMia = (t) => Object.values(t.acciones).some(Boolean) && !['RECIBIDA', 'RECHAZADA', 'CANCELADA'].includes(t.estado);
+
+/** Acciones de cada transferencia (menú ⋯) */
+const accionesFila = (f) => [{ texto: `Ver detalle (${f._count.detalles} producto${f._count.detalles === 1 ? '' : 's'})`, icono: 'transferencias', to: `/transferencias/${f.id}` }];
 </script>
 
 <template>
@@ -67,12 +72,13 @@ const pendienteMia = (t) => Object.values(t.acciones).some(Boolean) && !['RECIBI
     </div>
   </div>
 
-  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_16rem]">
+  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_16rem] md:grid-cols-[1fr_16rem_auto]">
     <CampoBusqueda v-model="filtros.q" placeholder="Número de transferencia" />
     <select v-model="filtros.almacenId" class="input">
       <option value="">Todos los almacenes</option>
       <option v-for="a in almacenes" :key="a.id" :value="a.id">{{ a.codigo }} — {{ a.nombre }}</option>
     </select>
+    <BotonColumnas :columnas="columnas" />
   </div>
 
   <TablaResponsiva :columnas="columnas" :filas="filas" :cargando="cargando" vacio="No hay transferencias">
@@ -89,9 +95,7 @@ const pendienteMia = (t) => Object.values(t.acciones).some(Boolean) && !['RECIBI
       <span class="whitespace-nowrap">{{ fila.destino.codigo }} {{ fila.destino.nombre }}</span>
     </template>
     <template #celda-solicitadoEn="{ fila }"><span class="whitespace-nowrap">{{ fechaHora(fila.solicitadoEn) }}</span></template>
-    <template #acciones="{ fila }">
-      <RouterLink :to="`/transferencias/${fila.id}`" class="btn-texto">Ver ({{ fila._count.detalles }})</RouterLink>
-    </template>
+    <template #acciones="{ fila }"><MenuAcciones :acciones="accionesFila(fila)" :etiqueta="`Acciones de la transferencia ${fila.numero}`" /></template>
   </TablaResponsiva>
   <Paginacion :pag="pag" />
 </template>

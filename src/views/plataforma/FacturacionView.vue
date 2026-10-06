@@ -11,6 +11,8 @@ import EncabezadoPagina from '@/components/EncabezadoPagina.vue';
 import TablaResponsiva from '@/components/TablaResponsiva.vue';
 import Paginacion from '@/components/Paginacion.vue';
 import BaseModal from '@/components/BaseModal.vue';
+import MenuAcciones from '@/components/MenuAcciones.vue';
+import BotonColumnas from '@/components/BotonColumnas.vue';
 
 const route = useRoute();
 const plataforma = usePlataforma();
@@ -59,6 +61,16 @@ async function confirmar() {
   }
 }
 const abrir = (tipo, factura = null) => Object.assign(dlg, { tipo, factura, texto: '' });
+
+/** Acciones de cada factura (menú ⋯) */
+const accionesFila = (f) =>
+  plataforma.esAdmin && f.estado === 'PENDIENTE'
+    ? [
+        { texto: 'Registrar pago', icono: 'check', alHacer: () => abrir('pagar', f) },
+        { separador: true },
+        { texto: 'Anular', icono: 'cerrar', peligro: true, alHacer: () => abrir('anular', f) },
+      ]
+    : [];
 </script>
 
 <template>
@@ -71,7 +83,7 @@ const abrir = (tipo, factura = null) => Object.assign(dlg, { tipo, factura, text
     <div class="tarjeta p-4"><p class="text-sm text-slate-500">Cobrado</p><p class="text-xl font-semibold text-emerald-700">{{ soles(resumen.PAGADA?.monto ?? 0) }}</p><p class="text-xs text-slate-500">{{ resumen.PAGADA?.cantidad ?? 0 }} factura(s)</p></div>
   </div>
 
-  <div class="mb-4 grid gap-2 sm:grid-cols-[12rem_12rem]">
+  <div class="mb-4 grid gap-2 sm:grid-cols-[12rem_12rem] md:grid-cols-[12rem_12rem_1fr]">
     <input v-model="filtros.periodo" type="month" class="input" aria-label="Periodo" />
     <select v-model="filtros.estado" class="input">
       <option value="">Todos los estados</option>
@@ -80,6 +92,7 @@ const abrir = (tipo, factura = null) => Object.assign(dlg, { tipo, factura, text
       <option value="PAGADA">Pagadas</option>
       <option value="ANULADA">Anuladas</option>
     </select>
+    <BotonColumnas class="justify-self-end" :columnas="columnas" />
   </div>
 
   <TablaResponsiva :columnas="columnas" :filas="filas" :cargando="cargando" vacio="No hay facturas para estos filtros">
@@ -90,12 +103,7 @@ const abrir = (tipo, factura = null) => Object.assign(dlg, { tipo, factura, text
       <span class="insignia" :class="estilo(fila)">{{ fila.vencida ? 'vencida' : fila.estado.toLowerCase() }}</span>
       <p v-if="fila.referenciaPago" class="text-xs text-slate-400">{{ fila.referenciaPago }}</p>
     </template>
-    <template #acciones="{ fila }">
-      <template v-if="plataforma.esAdmin && fila.estado === 'PENDIENTE'">
-        <button class="btn-texto text-emerald-700" @click="abrir('pagar', fila)">Registrar pago</button>
-        <button class="btn-texto text-red-600" @click="abrir('anular', fila)">Anular</button>
-      </template>
-    </template>
+    <template #acciones="{ fila }"><MenuAcciones :acciones="accionesFila(fila)" :etiqueta="`Acciones de la factura ${fila.numero ?? ''}`" /></template>
   </TablaResponsiva>
   <Paginacion :pag="pag" />
 

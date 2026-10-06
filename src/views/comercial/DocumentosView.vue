@@ -13,6 +13,8 @@ import TablaResponsiva from '@/components/TablaResponsiva.vue';
 import Paginacion from '@/components/Paginacion.vue';
 import CampoBusqueda from '@/components/CampoBusqueda.vue';
 import Icono from '@/components/Icono.vue';
+import MenuAcciones from '@/components/MenuAcciones.vue';
+import BotonColumnas from '@/components/BotonColumnas.vue';
 
 const route = useRoute();
 const auth = useAuth();
@@ -31,6 +33,12 @@ const columnas = computed(() => [
   { clave: 'total', titulo: 'Total', clase: 'text-right' },
   { clave: 'estado', titulo: 'Estado' },
 ]);
+
+/** Acciones de cada documento (menú ⋯) */
+const accionesFila = (f) => [
+  { texto: 'Ver documento', icono: 'comprobante', to: `${cfg.value.ruta}/${f.id}` },
+  f.acciones.editar && { texto: 'Editar borrador', icono: 'editar', to: `${cfg.value.ruta}/${f.id}/editar` },
+];
 </script>
 
 <template>
@@ -40,7 +48,7 @@ const columnas = computed(() => [
     </RouterLink>
   </EncabezadoPagina>
 
-  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_14rem_12rem]">
+  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_14rem_12rem] md:grid-cols-[1fr_14rem_12rem_auto]">
     <CampoBusqueda v-model="filtros.q" :placeholder="`${cfg.tercero}, RUC/DNI o número`" />
     <select v-model="filtros.almacenId" class="input">
       <option value="">Todos los almacenes</option>
@@ -50,6 +58,7 @@ const columnas = computed(() => [
       <option value="">Todos los estados</option>
       <option v-for="(e, k) in ESTADOS_DOCUMENTO" :key="k" :value="k">{{ e.texto }}</option>
     </select>
+    <BotonColumnas :columnas="columnas" />
   </div>
 
   <TablaResponsiva :columnas="columnas" :filas="filas" :cargando="cargando" :vacio="`No hay ${cfg.plural.toLowerCase()} registradas`">
@@ -68,10 +77,7 @@ const columnas = computed(() => [
     <template #celda-estado="{ fila }">
       <span class="insignia" :class="ESTADOS_DOCUMENTO[fila.estado].clase">{{ ESTADOS_DOCUMENTO[fila.estado].texto }}</span>
     </template>
-    <template #acciones="{ fila }">
-      <RouterLink v-if="fila.acciones.editar" :to="`${cfg.ruta}/${fila.id}/editar`" class="btn-texto"><Icono nombre="editar" clase="size-4" /> Editar</RouterLink>
-      <RouterLink :to="`${cfg.ruta}/${fila.id}`" class="btn-texto">Ver</RouterLink>
-    </template>
+    <template #acciones="{ fila }"><MenuAcciones :acciones="accionesFila(fila)" :etiqueta="`Acciones del documento ${fila.serie ?? ''}-${fila.numero ?? ''}`" /></template>
   </TablaResponsiva>
   <Paginacion :pag="pag" />
 </template>

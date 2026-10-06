@@ -14,6 +14,8 @@ import CampoBusqueda from '@/components/CampoBusqueda.vue';
 import BaseModal from '@/components/BaseModal.vue';
 import InsigniaEstado from '@/components/InsigniaEstado.vue';
 import Icono from '@/components/Icono.vue';
+import MenuAcciones from '@/components/MenuAcciones.vue';
+import BotonColumnas from '@/components/BotonColumnas.vue';
 
 const auth = useAuth();
 const contexto = useContexto();
@@ -51,11 +53,11 @@ const columnas = [
   { clave: 'sku', titulo: 'SKU' },
   { clave: 'categoria.nombre', titulo: 'Categoría' },
   { clave: 'unidad.codigo', titulo: 'Unidad' },
-  { clave: 'precioReferencial', titulo: 'Precio ref.', clase: 'text-right' },
+  { clave: 'precioReferencial', titulo: 'Precio venta', clase: 'text-right' },
   { clave: 'activo', titulo: 'Estado' },
 ];
 
-const vacio = () => ({ sku: '', nombre: '', codigoBarras: '', categoriaId: '', unidadId: unidades.value.find((u) => u.codigo === 'NIU')?.id || '', precioReferencial: '', descripcion: '', activo: true });
+const vacio = () => ({ sku: '', nombre: '', codigoBarras: '', categoriaId: '', unidadId: unidades.value.find((u) => u.codigo === 'NIU')?.id || '', precioReferencial: '', afectacionIgv: '10', descripcion: '', activo: true });
 const modal = reactive({ abierto: false, id: null, guardando: false, form: vacio(), nuevaCategoria: '' });
 
 function abrir(fila) {
@@ -64,7 +66,7 @@ function abrir(fila) {
   modal.form = fila
     ? {
         sku: fila.sku, nombre: fila.nombre, codigoBarras: fila.codigoBarras ?? '', categoriaId: fila.categoriaId ?? '',
-        unidadId: fila.unidadId, precioReferencial: fila.precioReferencial ?? '', descripcion: fila.descripcion ?? '', activo: fila.activo,
+        unidadId: fila.unidadId, precioReferencial: fila.precioReferencial ?? '', afectacionIgv: fila.afectacionIgv ?? '10', descripcion: fila.descripcion ?? '', activo: fila.activo,
       }
     : vacio();
   modal.abierto = true;
@@ -111,6 +113,14 @@ async function eliminar(fila) {
     toast.error(mensajeError(e));
   }
 }
+
+/** Acciones de cada producto (menú ⋯) */
+const accionesFila = (f) => [
+  { texto: 'Ver kardex', icono: 'kardex', to: { name: 'kardex', query: { productoId: f.id } } },
+  puedeEditar.value && { texto: 'Editar', icono: 'editar', alHacer: () => abrir(f) },
+  puedeEliminar.value && { separador: true },
+  puedeEliminar.value && { texto: 'Eliminar', icono: 'eliminar', peligro: true, alHacer: () => eliminar(f) },
+];
 </script>
 
 <template>
@@ -118,7 +128,7 @@ async function eliminar(fila) {
     <button v-if="puedeCrear" class="btn-primario" @click="abrir()"><Icono nombre="agregar" /> Nuevo producto</button>
   </EncabezadoPagina>
 
-  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_14rem_10rem]">
+  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_14rem_10rem] md:grid-cols-[1fr_14rem_10rem_auto]">
     <CampoBusqueda v-model="filtros.q" placeholder="Nombre, SKU o código de barras" />
     <select v-model="filtros.categoriaId" class="input">
       <option value="">Todas las categorías</option>
@@ -129,6 +139,7 @@ async function eliminar(fila) {
       <option value="true">Activos</option>
       <option value="false">Inactivos</option>
     </select>
+    <BotonColumnas :columnas="columnas" />
   </div>
 
   <TablaResponsiva :columnas="columnas" :filas="filas" :cargando="cargando" vacio="No hay productos en esta empresa">
@@ -139,11 +150,7 @@ async function eliminar(fila) {
     <template #celda-sku="{ fila }"><span class="font-mono text-xs">{{ fila.sku }}</span></template>
     <template #celda-precioReferencial="{ fila }">{{ soles(fila.precioReferencial) }}</template>
     <template #celda-activo="{ fila }"><InsigniaEstado :activo="fila.activo" /></template>
-    <template #acciones="{ fila }">
-      <RouterLink :to="{ name: 'kardex', query: { productoId: fila.id } }" class="btn-texto"><Icono nombre="kardex" clase="size-4" /> Kardex</RouterLink>
-      <button v-if="puedeEditar" class="btn-texto" @click="abrir(fila)"><Icono nombre="editar" clase="size-4" /> Editar</button>
-      <button v-if="puedeEliminar" class="btn-texto text-red-600 hover:bg-red-50" @click="eliminar(fila)"><Icono nombre="eliminar" clase="size-4" /></button>
-    </template>
+    <template #acciones="{ fila }"><MenuAcciones :acciones="accionesFila(fila)" :etiqueta="`Acciones de ${fila.nombre}`" /></template>
   </TablaResponsiva>
   <Paginacion :pag="pag" />
 
@@ -168,8 +175,16 @@ async function eliminar(fila) {
         </select>
       </div>
       <div>
-        <label class="etiqueta" for="pre">Precio referencial (S/)</label>
+        <label class="etiqueta" for="pre">Precio de venta con IGV (S/)</label>
         <input id="pre" v-model="modal.form.precioReferencial" class="input" type="number" inputmode="decimal" min="0" step="0.01" />
+      </div>
+      <div>
+        <label class="etiqueta" for="afe">IGV</label>
+        <select id="afe" v-model="modal.form.afectacionIgv" class="input">
+          <option value="10">Gravado (18%)</option>
+          <option value="20">Exonerado</option>
+          <option value="30">Inafecto</option>
+        </select>
       </div>
       <div class="sm:col-span-2">
         <label class="etiqueta" for="cat">Categoría</label>

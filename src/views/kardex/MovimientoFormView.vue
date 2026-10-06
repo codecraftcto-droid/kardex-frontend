@@ -36,10 +36,12 @@ const items = ref([]);
 const stock = ref(new Map());
 const enviando = ref(false);
 
-// Primer almacén permitido por defecto
+// Almacén por defecto: el indicado en la URL (p. ej. desde Inventario) o el primero permitido
 watch(almacenesPermitidos, (lista) => {
-  if (!lista.some((a) => a.id === form.almacenId)) form.almacenId = lista[0]?.id ?? '';
+  if (lista.some((a) => a.id === form.almacenId)) return;
+  form.almacenId = lista.find((a) => a.id === route.query.almacenId)?.id ?? lista[0]?.id ?? '';
 }, { immediate: true });
+let precargado = false;
 
 watch(tipo, () => {
   Object.assign(form, nuevo(), { almacenId: almacenesPermitidos.value[0]?.id ?? '' });
@@ -52,6 +54,12 @@ watch(() => form.almacenId, async (almacenId) => {
   if (!almacenId) return;
   const { data } = await api.get('/kardex/stock', { params: { empresaId: contexto.empresaActivaId, almacenId, porPagina: 200 } });
   stock.value = new Map(data.datos.map((s) => [s.productoId, s]));
+  // "Registrar entrada/salida de este producto": se agrega solo, una vez
+  const pedido = !precargado && almacenId === route.query.almacenId && stock.value.get(route.query.productoId);
+  if (pedido) {
+    precargado = true;
+    agregar(pedido.producto);
+  }
 }, { immediate: true });
 
 const disponible = (productoId) => Number(stock.value.get(productoId)?.cantidad ?? 0);

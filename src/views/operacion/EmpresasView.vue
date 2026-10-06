@@ -13,6 +13,8 @@ import CampoBusqueda from '@/components/CampoBusqueda.vue';
 import BaseModal from '@/components/BaseModal.vue';
 import InsigniaEstado from '@/components/InsigniaEstado.vue';
 import Icono from '@/components/Icono.vue';
+import MenuAcciones from '@/components/MenuAcciones.vue';
+import BotonColumnas from '@/components/BotonColumnas.vue';
 
 const auth = useAuth();
 const contexto = useContexto();
@@ -29,7 +31,7 @@ const columnas = [
   { clave: 'activo', titulo: 'Estado' },
 ];
 
-const vacio = () => ({ razonSocial: '', ruc: '', contacto: '', email: '', telefono: '', direccion: '', metodoValorizacion: 'PROMEDIO', activo: true });
+const vacio = () => ({ razonSocial: '', ruc: '', contacto: '', email: '', telefono: '', direccion: '', nombreComercial: '', metodoValorizacion: 'PROMEDIO', activo: true });
 const modal = reactive({ abierto: false, id: null, guardando: false, form: vacio() });
 
 function abrir(fila) {
@@ -72,6 +74,13 @@ async function eliminar(fila) {
     toast.error(mensajeError(e));
   }
 }
+
+/** Acciones de cada fila (menú ⋯), solo las permitidas sobre ese registro */
+const accionesFila = (f) => [
+  auth.can('empresas.empresa.editar', { empresaId: f.id }) && { texto: 'Editar', icono: 'editar', alHacer: () => abrir(f) },
+  auth.can('empresas.empresa.eliminar', { empresaId: f.id }) && { separador: true },
+  auth.can('empresas.empresa.eliminar', { empresaId: f.id }) && { texto: 'Eliminar', icono: 'eliminar', peligro: true, alHacer: () => eliminar(f) },
+];
 </script>
 
 <template>
@@ -81,26 +90,20 @@ async function eliminar(fila) {
     </button>
   </EncabezadoPagina>
 
-  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_auto] md:grid-cols-[1fr_auto_auto]">
     <CampoBusqueda v-model="filtros.q" placeholder="Buscar por razón social o RUC" />
     <select v-model="filtros.activo" class="input sm:w-40">
       <option value="">Todas</option>
       <option value="true">Activas</option>
       <option value="false">Inactivas</option>
     </select>
+    <BotonColumnas :columnas="columnas" />
   </div>
 
   <TablaResponsiva :columnas="columnas" :filas="filas" :cargando="cargando" vacio="No hay empresas">
     <template #celda-metodoValorizacion="{ fila }">{{ fila.metodoValorizacion === 'PEPS' ? 'PEPS' : 'Promedio ponderado' }}</template>
     <template #celda-activo="{ fila }"><InsigniaEstado :activo="fila.activo" textoSi="Activa" textoNo="Inactiva" /></template>
-    <template #acciones="{ fila }">
-      <button v-can="{ permiso: 'empresas.empresa.editar', recurso: { empresaId: fila.id } }" class="btn-texto" @click="abrir(fila)">
-        <Icono nombre="editar" clase="size-4" /> Editar
-      </button>
-      <button v-can="{ permiso: 'empresas.empresa.eliminar', recurso: { empresaId: fila.id } }" class="btn-texto text-red-600 hover:bg-red-50" @click="eliminar(fila)">
-        <Icono nombre="eliminar" clase="size-4" /> Eliminar
-      </button>
-    </template>
+    <template #acciones="{ fila }"><MenuAcciones :acciones="accionesFila(fila)" :etiqueta="`Acciones de ${fila.razonSocial ?? fila.nombre}`" /></template>
   </TablaResponsiva>
   <Paginacion :pag="pag" />
 
@@ -136,6 +139,10 @@ async function eliminar(fila) {
       <div class="sm:col-span-2">
         <label class="etiqueta" for="dir">Dirección</label>
         <input id="dir" v-model="modal.form.direccion" class="input" />
+      </div>
+      <div class="sm:col-span-2">
+        <label class="etiqueta" for="ncom">Nombre comercial (se imprime en los comprobantes)</label>
+        <input id="ncom" v-model="modal.form.nombreComercial" class="input" maxlength="150" />
       </div>
       <label v-if="modal.id" class="flex min-h-11 items-center gap-3 sm:col-span-2">
         <input v-model="modal.form.activo" type="checkbox" class="size-5 accent-marca-700" /> Empresa activa

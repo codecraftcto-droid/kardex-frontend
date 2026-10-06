@@ -3,7 +3,7 @@ import { useAuth } from '@/stores/auth';
 import { usePlataforma } from '@/stores/plataforma';
 
 /** Basta uno de estos permisos para ver la sección de reportes. */
-export const PERMISOS_REPORTES = ['reporte.stock.ver', 'reporte.movimientos.ver', 'reporte.valorizacion.ver', 'transferencia.ver'];
+export const PERMISOS_REPORTES = ['reporte.stock.ver', 'reporte.movimientos.ver', 'reporte.valorizacion.ver', 'transferencia.ver', 'reporte.ventas.ver', 'reporte.cxc.ver'];
 
 /**
  * meta.permisos → basta con uno de la lista
@@ -38,6 +38,13 @@ const routes = [
       { path: 'ventas/nueva', name: 'ventas-nueva', component: () => import('@/views/comercial/DocumentoFormView.vue'), meta: { permiso: 'ventas.venta.crear', titulo: 'Nueva', tipo: 'VENTA' } },
       { path: 'ventas/:id/editar', name: 'ventas-editar', component: () => import('@/views/comercial/DocumentoFormView.vue'), meta: { permiso: 'ventas.venta.crear', titulo: 'Editar', tipo: 'VENTA' } },
       { path: 'ventas/:id', name: 'ventas-detalle', component: () => import('@/views/comercial/DocumentoDetalleView.vue'), meta: { permiso: 'ventas.venta.ver', titulo: 'Ventas', tipo: 'VENTA' } },
+      { path: 'pos', name: 'pos', component: () => import('@/views/pos/PosView.vue'), meta: { permiso: 'pos.venta.crear', titulo: 'Caja' } },
+      { path: 'comprobantes', name: 'comprobantes', component: () => import('@/views/pos/ComprobantesView.vue'), meta: { permiso: 'pos.venta.ver', titulo: 'Comprobantes' } },
+      { path: 'comprobantes/:id', name: 'comprobante', component: () => import('@/views/pos/ComprobanteDetalleView.vue'), meta: { permiso: 'pos.venta.ver', titulo: 'Comprobante' } },
+      { path: 'clientes', name: 'clientes', component: () => import('@/views/pos/ClientesView.vue'), meta: { permiso: 'clientes.cliente.ver', titulo: 'Clientes' } },
+      { path: 'cuentas-por-cobrar', name: 'cxc', component: () => import('@/views/cxc/CuentasPorCobrarView.vue'), meta: { permiso: 'cxc.cuenta.ver', titulo: 'Cuentas por cobrar' } },
+      { path: 'cuentas-por-cobrar/:id', name: 'cxc-cliente', component: () => import('@/views/cxc/EstadoCuentaView.vue'), meta: { permiso: 'cxc.cuenta.ver', titulo: 'Estado de cuenta' } },
+      { path: 'cajas', name: 'cajas', component: () => import('@/views/pos/CajasView.vue'), meta: { permisos: ['pos.caja.configurar', 'pos.caja.ver'], titulo: 'Cajas y turnos' } },
       { path: 'productos', name: 'productos', component: () => import('@/views/kardex/ProductosView.vue'), meta: { permiso: 'productos.producto.ver', titulo: 'Productos' } },
       { path: 'empresas', name: 'empresas', component: () => import('@/views/operacion/EmpresasView.vue'), meta: { permiso: 'empresas.empresa.ver', titulo: 'Empresas' } },
       { path: 'sedes', name: 'sedes', component: () => import('@/views/operacion/SedesView.vue'), meta: { permiso: 'sedes.sede.ver', titulo: 'Sedes' } },
@@ -52,6 +59,11 @@ const routes = [
       { path: 'sin-acceso', name: 'sin-acceso', component: () => import('@/views/SinAccesoView.vue') },
     ],
   },
+  // ── Impresión de comprobantes y cierres (sin menú; ticket 80 mm o A4) ──
+  { path: '/imprimir/comprobante/:id/:formato(ticket|a4)', name: 'imprimir-comprobante', component: () => import('@/views/pos/ImprimirComprobanteView.vue'), meta: { permiso: 'pos.venta.ver', titulo: 'Imprimir comprobante' } },
+  { path: '/imprimir/cobranza/:id/:formato(ticket|a4)', name: 'imprimir-cobranza', component: () => import('@/views/cxc/ImprimirCobranzaView.vue'), meta: { permiso: 'cxc.cuenta.ver', titulo: 'Recibo de cobranza' } },
+  { path: '/imprimir/estado-cuenta/:id', name: 'imprimir-estado-cuenta', component: () => import('@/views/cxc/ImprimirEstadoCuentaView.vue'), meta: { permiso: 'cxc.cuenta.ver', titulo: 'Estado de cuenta' } },
+  { path: '/imprimir/turno/:id/:formato(ticket|a4)', name: 'imprimir-turno', component: () => import('@/views/pos/ImprimirTurnoView.vue'), meta: { titulo: 'Imprimir cierre de caja' } },
   // ── Plataforma SaaS (Módulo C): sesión y layout propios, separados de los estudios ──
   { path: '/plataforma/login', name: 'plataforma-login', component: () => import('@/views/plataforma/PlataformaLoginView.vue'), meta: { plataforma: true, publica: true, titulo: 'Plataforma' } },
   {

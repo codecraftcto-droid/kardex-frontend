@@ -7,6 +7,8 @@ import EncabezadoPagina from '@/components/EncabezadoPagina.vue';
 import TablaResponsiva from '@/components/TablaResponsiva.vue';
 import Paginacion from '@/components/Paginacion.vue';
 import BaseModal from '@/components/BaseModal.vue';
+import MenuAcciones from '@/components/MenuAcciones.vue';
+import BotonColumnas from '@/components/BotonColumnas.vue';
 
 const { filas, cargando, filtros, pag, cargar } = useListado('/auditoria', { accion: '' }, apiPlataforma);
 delete filtros.q;
@@ -19,17 +21,20 @@ const columnas = [
   { clave: 'estudio', titulo: 'Estudio' },
   { clave: 'ip', titulo: 'IP', ocultarEnTarjeta: true },
 ];
+
+/** Acciones de cada registro (menú ⋯) */
+const accionesFila = (f) => [(f.antes || f.despues) && { texto: 'Ver detalle del cambio', icono: 'auditoria', alHacer: () => (detalle.value = f) }];
 </script>
 
 <template>
   <EncabezadoPagina titulo="Auditoría de plataforma" subtitulo="Registro inmutable de accesos y acciones de administración" />
-  <div class="mb-4 sm:max-w-xs"><input v-model="filtros.accion" class="input" placeholder="Filtrar por acción (p. ej. suspender)" /></div>
+  <div class="mb-4 flex gap-2"><div class="min-w-0 flex-1 sm:max-w-xs"><input v-model="filtros.accion" class="input" placeholder="Filtrar por acción (p. ej. suspender)" /></div><BotonColumnas class="ml-auto" :columnas="columnas" /></div>
   <TablaResponsiva :columnas="columnas" :filas="filas" :cargando="cargando" vacio="Sin registros">
     <template #celda-accion="{ fila }"><code class="text-sm">{{ fila.accion }}</code></template>
     <template #celda-fecha="{ fila }"><span class="whitespace-nowrap">{{ fechaHora(fila.fecha) }}</span></template>
     <template #celda-admin="{ fila }">{{ fila.admin ?? '—' }}</template>
     <template #celda-estudio="{ fila }">{{ fila.estudio ?? '—' }}</template>
-    <template #acciones="{ fila }"><button v-if="fila.antes || fila.despues" class="btn-texto text-slate-700" @click="detalle = fila">Detalle</button></template>
+    <template #acciones="{ fila }"><MenuAcciones :acciones="accionesFila(fila)" :etiqueta="'Acciones del registro'" /></template>
   </TablaResponsiva>
   <Paginacion :pag="pag" />
   <BaseModal :abierto="!!detalle" titulo="Detalle" ancho="sm:max-w-2xl" @cerrar="detalle = null">

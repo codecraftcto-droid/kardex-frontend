@@ -6,6 +6,7 @@ import { api, mensajeError } from '@/services/api';
 import TarjetaAuth from '@/components/TarjetaAuth.vue';
 import CampoCodigo from '@/components/CampoCodigo.vue';
 import CodigosRecuperacion from '@/components/CodigosRecuperacion.vue';
+import FormCredenciales from '@/components/FormCredenciales.vue';
 
 const auth = useAuth();
 const route = useRoute();
@@ -85,22 +86,20 @@ const continuar = () =>
 
 <template>
   <TarjetaAuth
-    :titulo="{ credenciales: 'Kardex', verificar: 'Verificación en dos pasos', configurar: 'Configure la verificación en dos pasos', codigos: 'Códigos de recuperación' }[paso]"
-    :subtitulo="paso === 'credenciales' ? 'Sistema de inventario para estudios contables' : email"
+    :titulo="{ credenciales: 'Bienvenido de nuevo', verificar: 'Verificación en dos pasos', configurar: 'Configure la verificación en dos pasos', codigos: 'Códigos de recuperación' }[paso]"
+    :subtitulo="paso === 'credenciales' ? 'Ingrese con su correo y contraseña para continuar.' : email"
   >
     <!-- 1. Correo y contraseña -->
-    <form v-if="paso === 'credenciales'" class="space-y-4" @submit.prevent="enviarCredenciales">
-      <div>
-        <label class="etiqueta" for="email">Correo electrónico</label>
-        <input id="email" v-model="email" type="email" class="input" autocomplete="username" required autofocus />
-      </div>
-      <div>
-        <label class="etiqueta" for="password">Contraseña</label>
-        <input id="password" v-model="password" type="password" class="input" autocomplete="current-password" required />
-      </div>
-      <p v-if="error" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{{ error }}</p>
-      <button class="btn-primario w-full" :disabled="enviando">{{ enviando ? 'Ingresando…' : 'Ingresar' }}</button>
-    </form>
+    <FormCredenciales
+      v-if="paso === 'credenciales'"
+      v-model:email="email"
+      v-model:password="password"
+      :error="error"
+      :enviando="enviando"
+      ruta-olvido="/olvide"
+      nota="Acceso protegido · los datos de cada estudio están aislados"
+      @enviar="enviarCredenciales"
+    />
 
     <!-- 2a. Código de la app autenticadora -->
     <form v-else-if="paso === 'verificar'" class="space-y-4" @submit.prevent="enviarCodigo">
@@ -137,8 +136,7 @@ const continuar = () =>
     </div>
 
     <template #pie>
-      <RouterLink v-if="paso === 'credenciales'" to="/olvide" class="text-marca-700 hover:underline">¿Olvidó su contraseña?</RouterLink>
-      <button v-else-if="paso !== 'codigos'" class="text-slate-500 hover:underline" @click="reiniciar">Volver a ingresar</button>
+      <button v-if="!['credenciales', 'codigos'].includes(paso)" class="text-slate-500 hover:underline" @click="reiniciar">Volver a ingresar</button>
     </template>
   </TarjetaAuth>
 </template>

@@ -12,14 +12,19 @@ import Icono from '@/components/Icono.vue';
 const plataforma = usePlataforma();
 const toast = useToast();
 const planes = ref([]);
+const modulos = ref([]);
 const cargar = async () => (planes.value = (await apiPlataforma.get('/planes')).data);
-onMounted(cargar);
+onMounted(async () => {
+  cargar();
+  modulos.value = (await apiPlataforma.get('/modulos')).data;
+});
+const nombreModulo = (c) => modulos.value.find((m) => m.codigo === c)?.nombre ?? c;
 
-const vacio = () => ({ codigo: '', nombre: '', descripcion: '', precioMensual: '', maxEmpresas: '', maxUsuarios: '', maxAlmacenes: '', activo: true });
+const vacio = () => ({ codigo: '', nombre: '', descripcion: '', precioMensual: '', maxEmpresas: '', maxUsuarios: '', maxAlmacenes: '', modulos: ['inventario', 'pos', 'cxc', 'facturacion'], activo: true });
 const modal = reactive({ abierto: false, id: null, form: vacio(), guardando: false });
 function abrir(p) {
   modal.id = p?.id ?? null;
-  modal.form = p ? { ...vacio(), ...Object.fromEntries(Object.keys(vacio()).map((k) => [k, p[k] ?? ''])) } : vacio();
+  modal.form = p ? { ...vacio(), ...Object.fromEntries(Object.keys(vacio()).map((k) => [k, p[k] ?? ''])), modulos: [...(p.modulos ?? [])] } : vacio();
   modal.abierto = true;
 }
 async function guardar() {
@@ -60,6 +65,12 @@ const limite = (v) => (v == null ? 'Ilimitados' : v);
         <li>Empresas: <strong>{{ limite(p.maxEmpresas) }}</strong></li>
         <li>Usuarios: <strong>{{ limite(p.maxUsuarios) }}</strong></li>
         <li>Almacenes: <strong>{{ limite(p.maxAlmacenes) }}</strong></li>
+        <li class="pt-2">
+          <span class="mb-1 block text-xs text-slate-500">Módulos incluidos</span>
+          <span class="flex flex-wrap gap-1">
+            <span v-for="m in p.modulos" :key="m" class="insignia bg-marca-50 text-marca-800">{{ nombreModulo(m) }}</span>
+          </span>
+        </li>
       </ul>
       <div class="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-sm">
         <span class="text-slate-500">{{ p._count.estudios }} estudio(s)</span>
@@ -77,6 +88,16 @@ const limite = (v) => (v == null ? 'Ilimitados' : v);
       <div><label class="etiqueta">Máx. empresas</label><input v-model="modal.form.maxEmpresas" type="number" min="1" class="input" placeholder="Ilimitado" /></div>
       <div><label class="etiqueta">Máx. usuarios</label><input v-model="modal.form.maxUsuarios" type="number" min="1" class="input" placeholder="Ilimitado" /></div>
       <div><label class="etiqueta">Máx. almacenes</label><input v-model="modal.form.maxAlmacenes" type="number" min="1" class="input" placeholder="Ilimitado" /></div>
+      <fieldset class="sm:col-span-2">
+        <legend class="etiqueta">Módulos incluidos</legend>
+        <div class="grid gap-2 sm:grid-cols-2">
+          <label v-for="m in modulos" :key="m.codigo" class="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 p-2.5 text-sm hover:border-slate-300">
+            <input v-model="modal.form.modulos" type="checkbox" :value="m.codigo" class="mt-0.5 size-4 accent-marca-700" />
+            <span><span class="block font-medium">{{ m.nombre }}</span><span class="text-xs text-slate-500">{{ m.descripcion }}</span></span>
+          </label>
+        </div>
+        <p class="mt-1 text-xs text-slate-500">Inicio, empresas, sedes, almacenes, usuarios y auditoría vienen siempre incluidos.</p>
+      </fieldset>
       <label class="col-span-2 flex min-h-11 items-center gap-2 text-sm"><input v-model="modal.form.activo" type="checkbox" class="size-5" /> Disponible para nuevos estudios</label>
     </form>
     <template #pie>

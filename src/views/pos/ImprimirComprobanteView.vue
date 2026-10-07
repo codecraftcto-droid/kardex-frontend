@@ -1,9 +1,10 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
+import { usarHojaImpresion } from '@/utils/impresion';
 import { api, mensajeError } from '@/services/api';
 import { cant, fecha, fechaHora, num } from '@/utils/formato';
-import { MEDIOS_PAGO, MOTIVOS_NC, TIPOS_DOCUMENTO } from '@/utils/pos';
+import { DETRACCIONES, MEDIOS_PAGO, MOTIVOS_NC, TIPOS_DOCUMENTO } from '@/utils/pos';
 
 /**
  * Representación impresa del comprobante en ticket (80 mm) o A4.
@@ -13,7 +14,7 @@ const route = useRoute();
 const ticket = computed(() => route.params.formato === 'ticket');
 const c = ref(null);
 const error = ref('');
-let estilo;
+let quitarHoja;
 
 const TITULO = {
   FACTURA: 'FACTURA ELECTRÓNICA',
@@ -25,15 +26,13 @@ const pagos = computed(() => (c.value?.pagos ?? []).map((p) => ({ ...p, monto: M
 const empresaNombre = computed(() => c.value?.empresa.nombreComercial || c.value?.empresa.razonSocial);
 const direccion = computed(() => c.value?.caja.almacen.sede.direccion || c.value?.empresa.direccion);
 const credito = computed(() => c.value?.formaPago === 'CREDITO');
+const detraccion = computed(() => (Number(c.value?.detraccionMonto) > 0 ? { ...DETRACCIONES[c.value.detraccionCodigo], codigo: c.value.detraccionCodigo } : null));
+const retencion = computed(() => Number(c.value?.retencionMonto) > 0);
+const neto = computed(() => Number(c.value?.total) - Number(c.value?.detraccionMonto ?? 0) - Number(c.value?.retencionMonto ?? 0));
 const docCliente = computed(() => (c.value?.clienteTipoDocumento === 'SIN_DOCUMENTO' ? '' : `${TIPOS_DOCUMENTO[c.value.clienteTipoDocumento]}: ${c.value.clienteNumeroDocumento}`));
 
 onMounted(async () => {
-  // Tamaño de página según el formato (la impresora térmica usa rollo de 80 mm)
-  estilo = document.createElement('style');
-  estilo.textContent = ticket.value
-    ? '@page { size: 80mm auto; margin: 0 } body { background: #fff !important }'
-    : '@page { size: A4; margin: 12mm } body { background: #fff !important }';
-  document.head.appendChild(estilo);
+  quitarHoja = usarHojaImpresion(ticket.value, '12mm');
   try {
     c.value = (await api.get(`/pos/comprobantes/${route.params.id}`)).data;
     document.title = `${c.value.numeroCompleto} — ${c.value.nombreTipo}`;
@@ -46,7 +45,7 @@ onMounted(async () => {
     error.value = mensajeError(e, 'No se pudo cargar el comprobante');
   }
 });
-onBeforeUnmount(() => estilo?.remove());
+onBeforeUnmount(() => quitarHoja?.());
 const imprimir = () => window.print();
 const cerrar = () => window.close();
 </script>
@@ -88,7 +87,17 @@ const cerrar = () => window.close();
       <p v-if="Number(c.descuentoTotal)" class="flex justify-between"><span>Descuentos</span><span>{{ num(c.descuentoTotal, 2) }}</span></p>
       <p class="flex justify-between"><span>IGV 18%</span><span>{{ num(c.igv, 2) }}</span></p>
       <p class="flex justify-between text-[13px] font-bold"><span>TOTAL S/</span><span>{{ num(c.total, 2) }}</span></p>
+      <template v-if="detraccion || retencion">
+        <p class="flex justify-between"><span>{{ detraccion ? `Detracción ${num(c.detraccionPorcentaje, 2)}%` : 'Retención IGV 3%' }}</span><span>-{{ num(detraccion ? c.detraccionMonto : c.retencionMonto, 2) }}</span></p>
+        <p class="flex justify-between font-bold"><span>NETO A PAGAR</span><span>{{ num(neto, 2) }}</span></p>
+      </template>
       <p class="mt-1">{{ c.montoEnLetras }}</p>
+      <div v-if="detraccion" class="mt-1">
+        <p class="font-bold">Operación sujeta al Sistema de Pago de Obligaciones Tributarias (SPOT)</p>
+        <p>Bien/servicio: {{ detraccion.codigo }} - {{ detraccion.nombre }}</p>
+        <p>Cta. Banco de la Nación: {{ c.empresa.cuentaDetracciones }}</p>
+      </div>
+      <p v-if="retencion" class="mt-1">Operación sujeta a retención del IGV (3%).</p>
       <hr />
       <p v-for="p in pagos" :key="p.id" class="flex justify-between"><span>{{ c.tipo === 'NOTA_CREDITO' ? 'Reembolso ' : '' }}{{ MEDIOS_PAGO[p.medio] }}</span><span>{{ num(p.monto, 2) }}</span></p>
       <p v-if="c.montoRecibido" class="flex justify-between"><span>Recibido</span><span>{{ num(c.montoRecibido, 2) }}</span></p>
@@ -104,7 +113,10 @@ const cerrar = () => window.close();
         <p v-if="c.tipo === 'NOTA_VENTA'">Documento interno: no es un comprobante de pago.</p>
         <template v-else>
           <p>Representación impresa de la {{ TITULO[c.tipo].toLowerCase() }}.</p>
-          <p v-if="c.estadoSunat === 'PENDIENTE'" class="font-bold">PENDIENTE DE ENVÍO A SUNAT</p>
+          <p v-if="c.sunatHash" class="break-all">Hash: {{ c.sunatHash }}</p>
+          <p v-if="['PENDIENTE', 'ENVIADO'].includes(c.estadoSunat)" class="font-bold">{{ c.estadoSunat === 'PENDIENTE' ? 'PENDIENTE DE ENVÍO A SUNAT' : 'ENVIADO A SUNAT, EN ESPERA DE RESPUESTA' }}</p>
+          <p v-if="c.estadoSunat === 'RECHAZADO'" class="mt-1 text-[13px] font-bold">*** RECHAZADO POR SUNAT – SIN VALIDEZ ***</p>
+          <p v-if="c.estadoSunat === 'ANULADO'" class="mt-1 text-[13px] font-bold">*** DADO DE BAJA EN SUNAT ***</p>
         </template>
         <p v-if="c.estado === 'ANULADO'" class="mt-1 text-[14px] font-bold">*** ANULADO ***</p>
         <p class="mt-2">¡Gracias por su compra!</p>
@@ -160,6 +172,12 @@ const cerrar = () => window.close();
       <section class="mt-4 flex items-start justify-between gap-6">
         <div class="min-w-0 flex-1 space-y-2">
           <p class="font-semibold">{{ c.montoEnLetras }}</p>
+          <div v-if="detraccion" class="rounded border border-black p-2 text-[11px]">
+            <p class="font-bold">Operación sujeta al Sistema de Pago de Obligaciones Tributarias con el Gobierno Central (SPOT)</p>
+            <p>Bien o servicio: <strong>{{ detraccion.codigo }} - {{ detraccion.nombre }}</strong> · Porcentaje: {{ num(c.detraccionPorcentaje, 2) }}% · Monto: S/ {{ num(c.detraccionMonto, 2) }}</p>
+            <p>N.º de cuenta en el Banco de la Nación: <strong>{{ c.empresa.cuentaDetracciones }}</strong></p>
+          </div>
+          <p v-if="retencion" class="text-[11px]">Operación sujeta a retención del IGV (3%): S/ {{ num(c.retencionMonto, 2) }}.</p>
           <p v-if="pagos.length">
             <span class="font-semibold">{{ c.tipo === 'NOTA_CREDITO' ? 'Reembolso:' : 'Forma de pago:' }}</span>
             {{ pagos.map((p) => `${MEDIOS_PAGO[p.medio]} S/ ${num(p.monto, 2)}`).join(' · ') }}
@@ -178,7 +196,10 @@ const cerrar = () => window.close();
               <p v-if="c.tipo === 'NOTA_VENTA'">Documento interno: no es un comprobante de pago.</p>
               <template v-else>
                 <p>Representación impresa de la {{ TITULO[c.tipo].toLowerCase() }}.</p>
-                <p v-if="c.estadoSunat === 'PENDIENTE'" class="font-bold text-black">Pendiente de envío a SUNAT.</p>
+                <p v-if="c.sunatHash" class="break-all">Código hash: {{ c.sunatHash }}</p>
+                <p v-if="['PENDIENTE', 'ENVIADO'].includes(c.estadoSunat)" class="font-bold text-black">{{ c.estadoSunat === 'PENDIENTE' ? 'Pendiente de envío a SUNAT.' : 'Enviado a SUNAT, en espera de respuesta.' }}</p>
+                <p v-if="c.estadoSunat === 'RECHAZADO'" class="font-bold text-red-700">RECHAZADO POR SUNAT – SIN VALIDEZ.</p>
+                <p v-if="c.estadoSunat === 'ANULADO'" class="font-bold text-black">Dado de baja en SUNAT.</p>
               </template>
               <p>Atendido por {{ c.cajero }} · {{ c.caja.nombre }}</p>
             </div>
@@ -192,6 +213,10 @@ const cerrar = () => window.close();
             <tr v-if="Number(c.descuentoTotal)"><td class="py-0.5">Descuentos</td><td class="text-right">S/ {{ num(c.descuentoTotal, 2) }}</td></tr>
             <tr><td class="py-0.5">IGV 18%</td><td class="text-right">S/ {{ num(c.igv, 2) }}</td></tr>
             <tr class="border-t-2 border-black text-[14px] font-bold"><td class="py-1">TOTAL</td><td class="text-right">S/ {{ num(c.total, 2) }}</td></tr>
+            <template v-if="detraccion || retencion">
+              <tr><td class="py-0.5">{{ detraccion ? `Detracción ${num(c.detraccionPorcentaje, 2)}%` : 'Retención IGV 3%' }}</td><td class="text-right">- S/ {{ num(detraccion ? c.detraccionMonto : c.retencionMonto, 2) }}</td></tr>
+              <tr class="font-bold"><td class="py-0.5">NETO A PAGAR</td><td class="text-right">S/ {{ num(neto, 2) }}</td></tr>
+            </template>
           </tbody>
         </table>
       </section>

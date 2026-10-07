@@ -1,5 +1,7 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue';
+import { confirmar } from '@/utils/dialogos';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { api, mensajeError } from '@/services/api';
 import { useAuth } from '@/stores/auth';
 import { useContexto } from '@/stores/contexto';
@@ -15,6 +17,8 @@ import InsigniaEstado from '@/components/InsigniaEstado.vue';
 import Icono from '@/components/Icono.vue';
 import MenuAcciones from '@/components/MenuAcciones.vue';
 import BotonColumnas from '@/components/BotonColumnas.vue';
+import ModalFacturacion from '@/components/ModalFacturacion.vue';
+import ModalSire from '@/components/ModalSire.vue';
 
 const auth = useAuth();
 const contexto = useContexto();
@@ -31,7 +35,7 @@ const columnas = [
   { clave: 'activo', titulo: 'Estado' },
 ];
 
-const vacio = () => ({ razonSocial: '', ruc: '', contacto: '', email: '', telefono: '', direccion: '', nombreComercial: '', metodoValorizacion: 'PROMEDIO', activo: true });
+const vacio = () => ({ razonSocial: '', ruc: '', contacto: '', email: '', telefono: '', direccion: '', nombreComercial: '', cuentaDetracciones: '', exceptuadoRetencion: false, buenContribuyente: false, metodoValorizacion: 'PROMEDIO', activo: true });
 const modal = reactive({ abierto: false, id: null, guardando: false, form: vacio() });
 
 function abrir(fila) {
@@ -64,7 +68,7 @@ async function guardar() {
 }
 
 async function eliminar(fila) {
-  if (!confirm(`¿Eliminar la empresa "${fila.razonSocial}"? Esta acción no se puede deshacer.`)) return;
+  if (!(await confirmar({ titulo: `¿Eliminar ${fila.razonSocial}?`, texto: 'Esta acción no se puede deshacer.', confirmar: 'Eliminar empresa', peligro: true }))) return;
   try {
     await api.delete(`/empresas/${fila.id}`);
     toast.exito('Empresa eliminada');
@@ -76,7 +80,27 @@ async function eliminar(fila) {
 }
 
 /** Acciones de cada fila (menú ⋯), solo las permitidas sobre ese registro */
+// ── Facturación electrónica: ?facturacion=<empresaId> (enlace desde Comprobantes) ──
+const route = useRoute();
+const router = useRouter();
+const empresaFacturacion = computed(() => {
+  const id = route.query.facturacion;
+  return typeof id === 'string' ? filas.value.find((e) => e.id === id) ?? contexto.empresas.find((e) => e.id === id) ?? null : null;
+});
+const abrirFacturacion = (f) => router.push({ query: { ...route.query, facturacion: f.id } });
+const cerrarFacturacion = () => router.replace({ query: { ...route.query, facturacion: undefined } });
+
+// ── Credenciales SIRE: ?sire=<empresaId> ──
+const empresaSire = computed(() => {
+  const id = route.query.sire;
+  return typeof id === 'string' ? filas.value.find((e) => e.id === id) ?? contexto.empresas.find((e) => e.id === id) ?? null : null;
+});
+const abrirSire = (f) => router.push({ query: { ...route.query, sire: f.id } });
+const cerrarSire = () => router.replace({ query: { ...route.query, sire: undefined } });
+
 const accionesFila = (f) => [
+  auth.canEnEmpresa('cpe.configuracion.editar', f.id) && { texto: 'Facturación electrónica', icono: 'comprobante', alHacer: () => abrirFacturacion(f) },
+  auth.canEnEmpresa('sire.configuracion.editar', f.id) && { texto: 'Credenciales SIRE', icono: 'candado', alHacer: () => abrirSire(f) },
   auth.can('empresas.empresa.editar', { empresaId: f.id }) && { texto: 'Editar', icono: 'editar', alHacer: () => abrir(f) },
   auth.can('empresas.empresa.eliminar', { empresaId: f.id }) && { separador: true },
   auth.can('empresas.empresa.eliminar', { empresaId: f.id }) && { texto: 'Eliminar', icono: 'eliminar', peligro: true, alHacer: () => eliminar(f) },
@@ -144,6 +168,19 @@ const accionesFila = (f) => [
         <label class="etiqueta" for="ncom">Nombre comercial (se imprime en los comprobantes)</label>
         <input id="ncom" v-model="modal.form.nombreComercial" class="input" maxlength="150" />
       </div>
+      <div>
+        <label class="etiqueta" for="cdet">Cuenta de detracciones (Banco de la Nación)</label>
+        <input id="cdet" v-model="modal.form.cuentaDetracciones" class="input font-mono" maxlength="20" placeholder="00-000-000000" />
+        <p class="mt-1 text-xs text-slate-500">Se imprime en las facturas sujetas a detracción.</p>
+      </div>
+      <label class="flex min-h-11 items-start gap-3 pt-1 sm:pt-6">
+        <input v-model="modal.form.exceptuadoRetencion" type="checkbox" class="mt-0.5 size-5 accent-marca-700" />
+        <span class="text-sm">Buen contribuyente o agente de retención <span class="block text-xs text-slate-500">Sus clientes no le retienen el 3% del IGV.</span></span>
+      </label>
+      <label class="flex min-h-11 items-start gap-3 sm:col-span-2">
+        <input v-model="modal.form.buenContribuyente" type="checkbox" class="mt-0.5 size-5 accent-marca-700" />
+        <span class="text-sm">Buen contribuyente / UESP en el cronograma de SUNAT <span class="block text-xs text-slate-500">Sus vencimientos mensuales (SIRE, declaraciones) son los de ese grupo y no los del último dígito del RUC.</span></span>
+      </label>
       <label v-if="modal.id" class="flex min-h-11 items-center gap-3 sm:col-span-2">
         <input v-model="modal.form.activo" type="checkbox" class="size-5 accent-marca-700" /> Empresa activa
       </label>
@@ -153,4 +190,6 @@ const accionesFila = (f) => [
       <button class="btn-primario" form="form-empresa" :disabled="modal.guardando">Guardar</button>
     </template>
   </BaseModal>
+  <ModalFacturacion :abierto="!!empresaFacturacion" :empresa="empresaFacturacion" @cerrar="cerrarFacturacion" />
+  <ModalSire :abierto="!!empresaSire" :empresa="empresaSire" @cerrar="cerrarSire" />
 </template>

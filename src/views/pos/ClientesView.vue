@@ -1,4 +1,5 @@
 <script setup>
+import { confirmar } from '@/utils/dialogos';
 import { onMounted, reactive } from 'vue';
 import { soles } from '@/utils/formato';
 import { api, mensajeError } from '@/services/api';
@@ -38,7 +39,7 @@ function guardado() {
   cargar();
 }
 async function eliminar(c) {
-  if (!confirm(`¿Eliminar a ${c.nombre}?`)) return;
+  if (!(await confirmar({ titulo: `¿Eliminar a ${c.nombre}?`, texto: 'Esta acción no se puede deshacer.', confirmar: 'Eliminar cliente', peligro: true }))) return;
   try {
     await api.delete(`/clientes/${c.id}`);
     toast.exito('Cliente eliminado');

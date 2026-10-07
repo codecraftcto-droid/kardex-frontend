@@ -26,6 +26,7 @@ const opciones = [
   { to: '/inventario', etiqueta: 'Inventario', icono: 'inventario', permiso: 'kardex.stock.ver', grupo: 'Kardex' },
   { to: '/movimientos', etiqueta: 'Movimientos', icono: 'movimientos', permiso: 'kardex.stock.ver', grupo: 'Kardex' },
   { to: '/transferencias', etiqueta: 'Transferencias', icono: 'transferencias', permiso: 'transferencia.ver', grupo: 'Kardex' },
+  { to: '/guias', etiqueta: 'Guías de remisión', icono: 'transferencias', permiso: 'gre.guia.ver', grupo: 'Kardex' },
   { to: '/productos', etiqueta: 'Productos', icono: 'productos', permiso: 'productos.producto.ver', grupo: 'Kardex' },
   { to: '/kardex', etiqueta: 'Kardex por producto', icono: 'kardex', permiso: 'kardex.stock.ver', grupo: 'Kardex' },
   { to: '/reportes', etiqueta: 'Reportes', icono: 'reportes', permisos: PERMISOS_REPORTES, grupo: 'Kardex' },
@@ -36,6 +37,12 @@ const opciones = [
   { to: '/cajas', etiqueta: 'Cajas y turnos', icono: 'kardex', permisos: ['pos.caja.configurar', 'pos.caja.ver'], grupo: 'Punto de venta' },
   { to: '/compras', etiqueta: 'Compras', icono: 'entrada', permiso: 'compras.compra.ver', grupo: 'Comercial' },
   { to: '/ventas', etiqueta: 'Ventas', icono: 'salida', permiso: 'ventas.venta.ver', grupo: 'Comercial' },
+  { to: '/contabilidad/asientos', etiqueta: 'Asientos', icono: 'comprobante', permiso: 'contabilidad.asiento.ver', grupo: 'Contabilidad' },
+  { to: '/contabilidad/libros', etiqueta: 'Libros Diario y Mayor', icono: 'reportes', permiso: 'contabilidad.asiento.ver', grupo: 'Contabilidad' },
+  { to: '/contabilidad/estados', etiqueta: 'Estados financieros', icono: 'kardex', permiso: 'contabilidad.estados.ver', grupo: 'Contabilidad' },
+  { to: '/contabilidad/plan', etiqueta: 'Plan contable', icono: 'kardex', permiso: 'contabilidad.plan.ver', grupo: 'Contabilidad' },
+  { to: '/sire/panel', etiqueta: 'Panel SIRE', icono: 'reportes', permiso: 'sire.periodo.ver', grupo: 'SUNAT' },
+  { to: '/sire', etiqueta: 'Períodos SIRE', icono: 'calendario', permiso: 'sire.periodo.ver', grupo: 'SUNAT' },
   { to: '/empresas', etiqueta: 'Empresas', icono: 'empresa', permiso: 'empresas.empresa.ver', grupo: 'Organización' },
   { to: '/sedes', etiqueta: 'Sedes', icono: 'sede', permiso: 'sedes.sede.ver', grupo: 'Organización' },
   { to: '/almacenes', etiqueta: 'Almacenes', icono: 'almacen', permiso: 'almacenes.almacen.ver', grupo: 'Organización' },
@@ -52,6 +59,7 @@ const ACCIONES = [
   { to: '/movimientos/entrada', etiqueta: 'Registrar entrada', icono: 'entrada', permiso: 'kardex.entrada.crear', grupo: 'Acción' },
   { to: '/movimientos/salida', etiqueta: 'Registrar salida', icono: 'salida', permiso: 'kardex.salida.crear', grupo: 'Acción' },
   { to: '/transferencias/nueva', etiqueta: 'Nueva transferencia', icono: 'transferencias', permiso: 'transferencia.solicitar', grupo: 'Acción' },
+  { to: '/guias/nueva', etiqueta: 'Nueva guía de remisión', icono: 'transferencias', permiso: 'gre.guia.crear', grupo: 'Acción' },
   { to: '/compras/nueva', etiqueta: 'Registrar compra', icono: 'entrada', permiso: 'compras.compra.crear', grupo: 'Acción' },
   { to: '/perfil', etiqueta: 'Mi perfil y sesiones', icono: 'perfil', grupo: 'Cuenta' },
 ];
@@ -89,7 +97,9 @@ const esMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigat
 const principales = computed(() => visibles.value.slice(0, 4));
 const secundarias = computed(() => visibles.value.slice(4));
 
-const activo = (to) => (to === '/' ? route.path === '/' : route.path.startsWith(to));
+const coincide = (to) => route.path === to || route.path.startsWith(`${to}/`);
+// Activa la opción que coincide con la ruta, salvo que otra más específica también coincida (p. ej. /sire y /sire/panel)
+const activo = (to) => (to === '/' ? route.path === '/' : coincide(to) && !opciones.some((o) => o.to.length > to.length && o.to.startsWith(`${to}/`) && coincide(o.to)));
 const hojaAbierta = ref(false);
 const menuUsuario = ref(false);
 watch(() => route.fullPath, () => { hojaAbierta.value = false; menuUsuario.value = false; });
@@ -115,7 +125,7 @@ const { disponible: puedeInstalar, instalar } = useInstalacion();
  */
 const DETALLE_A_LISTADO = {
   comprobante: '/comprobantes', pos: '/pos', 'cxc-cliente': '/cuentas-por-cobrar',
-  movimiento: '/movimientos', kardex: '/kardex', transferencia: '/transferencias', 'transferencia-nueva': '/transferencias',
+  movimiento: '/movimientos', kardex: '/kardex', transferencia: '/transferencias', 'transferencia-nueva': '/transferencias', 'guia-nueva': '/guias', 'sire-registro': '/sire',
   'compras-nueva': '/compras', 'compras-editar': '/compras', 'compras-detalle': '/compras',
   'ventas-nueva': '/ventas', 'ventas-editar': '/ventas', 'ventas-detalle': '/ventas',
 };
@@ -124,7 +134,9 @@ watch(
   (nueva, anterior) => {
     if (!anterior || !nueva) return;
     const destino = DETALLE_A_LISTADO[route.name];
-    if (destino && (route.name !== 'kardex' || Object.keys(route.query).length)) router.replace(destino);
+    // Una guía precargada desde un documento cambia ella misma a la empresa de ese documento
+    const guiaDesdeDocumento = route.name === 'guia-nueva' && route.query.desde;
+    if (destino && !guiaDesdeDocumento && (route.name !== 'kardex' || Object.keys(route.query).length)) router.replace(destino);
     toast.info(`Empresa activa: ${contexto.empresaActiva?.razonSocial}`);
   },
 );

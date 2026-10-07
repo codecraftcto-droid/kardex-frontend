@@ -12,6 +12,8 @@ import EncabezadoPagina from '@/components/EncabezadoPagina.vue';
 import TablaResponsiva from '@/components/TablaResponsiva.vue';
 import BaseModal from '@/components/BaseModal.vue';
 import Icono from '@/components/Icono.vue';
+import InsigniaSunat from '@/components/InsigniaSunat.vue';
+import { useTiempoReal } from '@/composables/useTiempoReal';
 
 const route = useRoute();
 const router = useRouter();
@@ -25,6 +27,26 @@ function cobrado() {
   cobro.value = false;
   cargar();
 }
+// ── SUNAT ──
+const electronico = computed(() => c.value && c.value.tipo !== 'NOTA_VENTA');
+const puedeGuia = computed(() => c.value && ['FACTURA', 'BOLETA'].includes(c.value.tipo) && c.value.estado !== 'ANULADO' && auth.canEnEmpresa('gre.guia.crear', c.value.empresaId));
+const puedeEnviarSunat = computed(() => c.value && auth.canEnEmpresa('cpe.envio.gestionar', c.value.empresaId));
+const sunat = reactive({ enviando: false });
+async function enviarSunat() {
+  sunat.enviando = true;
+  try {
+    const { data } = await api.post(`/cpe/comprobantes/${c.value.id}/enviar`);
+    (data.error ? toast.error : toast.exito)(data.mensaje || 'Enviado');
+    await cargar();
+  } catch (e) {
+    toast.error(mensajeError(e));
+  } finally {
+    sunat.enviando = false;
+  }
+}
+// La respuesta de SUNAT llega sola (cola en segundo plano)
+useTiempoReal('pos:comprobante', (x) => x.id === c.value?.id && cargar());
+
 const cuotaVencida = (k) => k.vencida && Number(k.pendiente) > 0;
 
 async function cargar() {
@@ -98,11 +120,12 @@ async function emitirNC() {
       <template #antes>
         <RouterLink to="/comprobantes" class="mb-1 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"><Icono nombre="atras" clase="size-4" /> Comprobantes</RouterLink>
         <span class="insignia mb-1 ml-2" :class="estiloEstado(c)">{{ c.estado === 'ANULADO' ? 'Anulado' : 'Emitido' }}</span>
-        <span v-if="c.estadoSunat === 'PENDIENTE'" class="insignia mb-1 ml-1 bg-amber-50 text-amber-700">SUNAT: pendiente de envío</span>
+        <InsigniaSunat v-if="electronico" class="mb-1 ml-1" :estado="c.estadoSunat" corto />
       </template>
       <button class="btn-secundario" @click="imprimir('ticket')"><Icono nombre="imprimir" clase="size-4" /> Ticket</button>
       <button class="btn-secundario" @click="imprimir('a4')"><Icono nombre="imprimir" clase="size-4" /> A4</button>
       <button v-if="c.acciones.cobrar" class="btn-primario" @click="cobro = true"><Icono nombre="tarjeta" clase="size-4" /> Cobrar</button>
+      <RouterLink v-if="puedeGuia" :to="`/guias/nueva?desde=comprobante&id=${c.id}`" class="btn-secundario"><Icono nombre="transferencias" clase="size-4" /> Guía de remisión</RouterLink>
       <button v-if="c.acciones.notaCredito" class="btn-secundario" @click="abrirNC">Nota de crédito</button>
       <button v-if="c.acciones.anular" class="btn-peligro" @click="(anulacion.motivo = ''), (anulacion.abierto = true)">Anular</button>
     </EncabezadoPagina>
@@ -117,6 +140,48 @@ async function emitirNC() {
       Notas de crédito:
       <RouterLink v-for="n in c.notasCredito" :key="n.id" :to="`/comprobantes/${n.id}`" class="mr-2 font-mono underline" :class="{ 'line-through': n.estado === 'ANULADO' }">{{ n.serie }}-{{ String(n.numero).padStart(8, '0') }} ({{ soles(n.total) }})</RouterLink>
     </p>
+
+    <!-- Facturación electrónica -->
+    <section v-if="electronico" class="tarjeta p-4 sm:p-5">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h2 class="flex items-center gap-2 font-semibold">SUNAT <InsigniaSunat :estado="c.estadoSunat" /></h2>
+          <p v-if="c.sunatDescripcion" class="mt-1 text-sm text-slate-600">
+            <span v-if="c.sunatCodigo && c.sunatCodigo !== '0'" class="font-mono text-xs text-slate-500">Código {{ c.sunatCodigo }} · </span>{{ c.sunatDescripcion }}
+          </p>
+          <p v-else-if="c.estadoSunat === 'PENDIENTE'" class="mt-1 text-sm text-slate-500">Aún no se envía a SUNAT.</p>
+          <p v-if="c.sunatUltimoError && !['ACEPTADO', 'OBSERVADO', 'ANULADO'].includes(c.estadoSunat)" class="mt-1 text-sm text-red-700">Último intento: {{ c.sunatUltimoError }}</p>
+          <p v-if="c.estadoSunat === 'RECHAZADO'" class="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
+            Un comprobante rechazado <strong>no tiene validez</strong>. Corrija el dato observado (por ejemplo, el documento del cliente) y emita uno nuevo;
+            si ya se cobró, anule este y vuelva a emitir.
+          </p>
+          <p v-if="c.bajaEstado" class="mt-1 text-sm" :class="c.bajaEstado === 'ACEPTADA' ? 'text-slate-600' : 'text-amber-700'">
+            Comunicación de baja: <strong>{{ { ACEPTADA: 'aceptada', PENDIENTE: 'en proceso', ERROR: 'con error' }[c.bajaEstado] ?? c.bajaEstado }}</strong>
+            <template v-if="c.bajaMensaje"> · {{ c.bajaMensaje }}</template>
+          </p>
+        </div>
+        <button
+          v-if="puedeEnviarSunat && ['PENDIENTE', 'ENVIADO'].includes(c.estadoSunat) && !(c.estado === 'ANULADO' && !c.sunatEnviadoEn)"
+          class="btn-primario shrink-0"
+          :disabled="sunat.enviando"
+          @click="enviarSunat"
+        >
+          {{ sunat.enviando ? 'Enviando…' : c.estadoSunat === 'ENVIADO' ? 'Consultar respuesta' : 'Enviar a SUNAT' }}
+        </button>
+      </div>
+      <dl v-if="c.sunatEnviadoEn" class="mt-3 grid gap-x-6 gap-y-2 border-t border-slate-100 pt-3 text-sm sm:grid-cols-3">
+        <div><dt class="text-xs text-slate-500">Enviado</dt><dd>{{ fechaHora(c.sunatEnviadoEn) }}<span class="text-xs text-slate-400"> · {{ c.sunatIntentos }} intento(s)</span></dd></div>
+        <div v-if="c.sunatHash" class="min-w-0"><dt class="text-xs text-slate-500">Código hash</dt><dd class="truncate font-mono text-xs" :title="c.sunatHash">{{ c.sunatHash }}</dd></div>
+        <div v-if="c.sunatXml || c.sunatCdr || c.sunatPdf">
+          <dt class="text-xs text-slate-500">Archivos</dt>
+          <dd class="flex flex-wrap gap-3">
+            <a v-if="c.sunatXml" :href="c.sunatXml" target="_blank" rel="noopener" class="text-marca-700 hover:underline">XML</a>
+            <a v-if="c.sunatCdr" :href="c.sunatCdr" target="_blank" rel="noopener" class="text-marca-700 hover:underline">CDR</a>
+            <a v-if="c.sunatPdf" :href="c.sunatPdf" target="_blank" rel="noopener" class="text-marca-700 hover:underline">PDF del proveedor</a>
+          </dd>
+        </div>
+      </dl>
+    </section>
 
     <section class="tarjeta p-4 sm:p-5">
       <dl class="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -159,6 +224,13 @@ async function emitirNC() {
         <div v-if="Number(c.descuentoTotal)" class="flex justify-between"><dt class="text-slate-500">Descuentos<template v-if="Number(c.descuentoGlobal)"> (global {{ soles(c.descuentoGlobal) }})</template></dt><dd class="tabular-nums">{{ soles(c.descuentoTotal) }}</dd></div>
         <div class="flex justify-between"><dt class="text-slate-500">IGV</dt><dd class="tabular-nums">{{ soles(c.igv) }}</dd></div>
         <div class="flex justify-between border-t border-slate-100 pt-1 text-base font-semibold"><dt>Total</dt><dd class="tabular-nums">{{ soles(c.total) }}</dd></div>
+        <template v-if="Number(c.detraccionMonto) || Number(c.retencionMonto)">
+          <div class="flex justify-between text-amber-800">
+            <dt>{{ Number(c.detraccionMonto) ? `Detracción ${Number(c.detraccionPorcentaje)}% (código ${c.detraccionCodigo})` : 'Retención IGV 3%' }}</dt>
+            <dd class="tabular-nums">−{{ soles(Number(c.detraccionMonto) || c.retencionMonto) }}</dd>
+          </div>
+          <div class="flex justify-between font-medium"><dt>Neto a cobrar</dt><dd class="tabular-nums">{{ soles(Number(c.total) - Number(c.detraccionMonto) - Number(c.retencionMonto)) }}</dd></div>
+        </template>
         <p class="pt-1 text-xs text-slate-500">{{ c.montoEnLetras }}</p>
       </dl>
     </div>

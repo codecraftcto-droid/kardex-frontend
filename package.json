@@ -15,6 +15,7 @@
     "axios": "^1.12.2",
     "pinia": "^3.0.3",
     "socket.io-client": "^4.8.1",
+    "sweetalert2": "^11.26.25",
     "vue": "^3.5.22",
     "vue-router": "^4.5.1"
   },

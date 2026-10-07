@@ -124,3 +124,57 @@ export function rucValido(ruc) {
   const resto = 11 - (suma % 11);
   return (resto === 10 ? 0 : resto === 11 ? 1 : resto) === Number(ruc[10]);
 }
+
+/** Estado del comprobante ante SUNAT (facturación electrónica) */
+export const ESTADOS_SUNAT = {
+  NO_APLICA: { texto: 'No aplica', corto: 'Interno', clase: 'bg-slate-100 text-slate-500', punto: 'bg-slate-400' },
+  PENDIENTE: { texto: 'Pendiente de envío', corto: 'Pendiente', clase: 'bg-amber-50 text-amber-800', punto: 'bg-amber-500' },
+  ENVIADO: { texto: 'Enviado, esperando a SUNAT', corto: 'Enviado', clase: 'bg-sky-50 text-sky-700', punto: 'bg-sky-500' },
+  ACEPTADO: { texto: 'Aceptado por SUNAT', corto: 'Aceptado', clase: 'bg-emerald-50 text-emerald-700', punto: 'bg-emerald-500' },
+  OBSERVADO: { texto: 'Aceptado con observaciones', corto: 'Observado', clase: 'bg-lime-50 text-lime-800', punto: 'bg-lime-500' },
+  RECHAZADO: { texto: 'Rechazado por SUNAT', corto: 'Rechazado', clase: 'bg-red-50 text-red-700', punto: 'bg-red-500' },
+  ANULADO: { texto: 'Dado de baja en SUNAT', corto: 'De baja', clase: 'bg-slate-100 text-slate-600', punto: 'bg-slate-500' },
+};
+
+/** Catálogo 54 (detracciones). Debe coincidir con el backend (src/pos/reglas.js). */
+export const DETRACCIONES = {
+  '001': { nombre: 'Azúcar y melaza de caña', porcentaje: 10 },
+  '004': { nombre: 'Recursos hidrobiológicos', porcentaje: 4 },
+  '005': { nombre: 'Maíz amarillo duro', porcentaje: 4 },
+  '008': { nombre: 'Madera', porcentaje: 4 },
+  '009': { nombre: 'Arena y piedra', porcentaje: 10 },
+  '010': { nombre: 'Residuos, subproductos, desechos, recortes y desperdicios', porcentaje: 15 },
+  '012': { nombre: 'Intermediación laboral y tercerización', porcentaje: 12 },
+  '014': { nombre: 'Carnes y despojos comestibles', porcentaje: 4 },
+  '019': { nombre: 'Arrendamiento de bienes muebles', porcentaje: 10 },
+  '020': { nombre: 'Mantenimiento y reparación de bienes muebles', porcentaje: 12 },
+  '021': { nombre: 'Movimiento de carga', porcentaje: 10 },
+  '022': { nombre: 'Otros servicios empresariales', porcentaje: 12 },
+  '024': { nombre: 'Comisión mercantil', porcentaje: 10 },
+  '025': { nombre: 'Fabricación de bienes por encargo', porcentaje: 10 },
+  '026': { nombre: 'Servicio de transporte de personas', porcentaje: 10 },
+  '027': { nombre: 'Servicio de transporte de carga', porcentaje: 4 },
+  '030': { nombre: 'Contratos de construcción', porcentaje: 4 },
+  '031': { nombre: 'Oro gravado con el IGV', porcentaje: 10 },
+  '034': { nombre: 'Minerales metálicos no auríferos', porcentaje: 10 },
+  '035': { nombre: 'Bienes exonerados del IGV', porcentaje: 1.5 },
+  '037': { nombre: 'Demás servicios gravados con el IGV', porcentaje: 12 },
+};
+export const UMBRAL_SPOT = 700;
+
+/** Mismo cálculo que el backend: detracción (SPOT) o retención 3 % de una factura y el neto a cobrar. */
+export function calcularSpot({ tipo, total, igv, codigos = [], clienteAgenteRetencion = false, empresaExceptuada = false }) {
+  const nada = { detraccion: null, retencion: 0, aCobrar: total };
+  if (tipo !== 'FACTURA' || !(total > UMBRAL_SPOT)) return nada;
+  const sujetos = [...new Set(codigos.filter((c) => DETRACCIONES[c]))].sort((a, b) => DETRACCIONES[b].porcentaje - DETRACCIONES[a].porcentaje);
+  if (sujetos.length) {
+    const codigo = sujetos[0];
+    const monto = Math.round((total * DETRACCIONES[codigo].porcentaje) / 100);
+    return { detraccion: { codigo, ...DETRACCIONES[codigo], monto }, retencion: 0, aCobrar: Math.round((total - monto) * 100) / 100 };
+  }
+  if (clienteAgenteRetencion && !empresaExceptuada && igv > 0) {
+    const retencion = Math.round(total * 3) / 100;
+    return { detraccion: null, retencion, aCobrar: Math.round((total - retencion) * 100) / 100 };
+  }
+  return nada;
+}

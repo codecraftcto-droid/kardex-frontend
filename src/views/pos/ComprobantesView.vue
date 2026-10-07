@@ -1,11 +1,14 @@
 <script setup>
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
+import { api, mensajeError } from '@/services/api';
+import { useToast } from '@/stores/toast';
 import { useRoute } from 'vue-router';
 import { useContexto } from '@/stores/contexto';
 import { useListado } from '@/composables/useListado';
 import { useTiempoReal } from '@/composables/useTiempoReal';
 import { fechaHora, soles } from '@/utils/formato';
-import { TIPOS_COMPROBANTE, estiloEstado, numeroCompleto } from '@/utils/pos';
+import { ESTADOS_SUNAT, TIPOS_COMPROBANTE, estiloEstado, numeroCompleto } from '@/utils/pos';
+import InsigniaSunat from '@/components/InsigniaSunat.vue';
 import EncabezadoPagina from '@/components/EncabezadoPagina.vue';
 import TablaResponsiva from '@/components/TablaResponsiva.vue';
 import Paginacion from '@/components/Paginacion.vue';
@@ -15,11 +18,31 @@ import BotonColumnas from '@/components/BotonColumnas.vue';
 
 const route = useRoute();
 const contexto = useContexto();
+const toast = useToast();
 const { filas, cargando, filtros, pag, cargar } = useListado('/pos/comprobantes', {
-  empresaId: contexto.empresaActivaId, tipo: '', estado: '', sesionCajaId: route.query.sesion ?? '',
+  empresaId: contexto.empresaActivaId, tipo: '', estado: '', estadoSunat: route.query.sunat ?? '', sesionCajaId: route.query.sesion ?? '',
 });
-onMounted(cargar);
-useTiempoReal('pos:comprobante', cargar);
+
+// ── Estado de la facturación electrónica de la empresa ──
+const sunat = ref(null);
+const cargarResumen = async () => {
+  try { sunat.value = (await api.get('/cpe/resumen', { params: { empresaId: contexto.empresaActivaId } })).data; } catch { sunat.value = null; }
+};
+const pendientes = () => (sunat.value?.porEstado.PENDIENTE ?? 0);
+const enviando = ref(false);
+async function enviarPendientes() {
+  enviando.value = true;
+  try {
+    const { data } = await api.post('/cpe/pendientes/enviar', { empresaId: contexto.empresaActivaId });
+    toast.exito(`${data.encolados} comprobante(s) en camino a SUNAT; el estado se actualiza solo`);
+  } catch (e) {
+    toast.error(mensajeError(e));
+  } finally {
+    enviando.value = false;
+  }
+}
+onMounted(() => (cargar(), cargarResumen()));
+useTiempoReal('pos:comprobante', () => (cargar(), cargarResumen()));
 
 const columnas = [
   { clave: 'numero', titulo: 'Comprobante' },
@@ -27,6 +50,7 @@ const columnas = [
   { clave: 'clienteNombre', titulo: 'Cliente' },
   { clave: 'total', titulo: 'Total', clase: 'text-right' },
   { clave: 'estado', titulo: 'Estado' },
+  { clave: 'estadoSunat', titulo: 'SUNAT' },
   { clave: 'caja.nombre', titulo: 'Caja', ocultarEnTarjeta: true },
 ];
 
@@ -43,10 +67,22 @@ const accionesFila = (f) => [
   <EncabezadoPagina titulo="Comprobantes" :subtitulo="filtros.sesionCajaId ? 'Ventas del turno de caja' : contexto.empresaActiva?.razonSocial">
     <button v-if="filtros.sesionCajaId" class="btn-secundario" @click="filtros.sesionCajaId = ''">Ver todos</button>
   </EncabezadoPagina>
-  <p class="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-    Las facturas, boletas y notas de crédito aún <strong>no se envían a SUNAT</strong>: quedan como "pendiente de envío" hasta conectar la facturación electrónica.
-  </p>
-  <div class="mb-4 grid gap-2 sm:grid-cols-[1fr_12rem_10rem] md:grid-cols-[1fr_12rem_10rem_auto]">
+  <!-- Facturación electrónica: aviso según el estado de la empresa -->
+  <template v-if="sunat">
+    <p v-if="!sunat.configurada" class="mb-3 flex flex-wrap items-center gap-x-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+      Esta empresa aún <strong>no envía comprobantes a SUNAT</strong>: quedan como "pendientes" hasta configurar la facturación electrónica.
+      <RouterLink v-if="sunat.puedeConfigurar" :to="{ path: '/empresas', query: { facturacion: contexto.empresaActivaId } }" class="font-medium underline">Configurar ahora</RouterLink>
+    </p>
+    <div v-else-if="pendientes() || sunat.porEstado.RECHAZADO" class="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+      <span v-if="pendientes()" class="text-slate-700"><strong class="tabular-nums">{{ pendientes() }}</strong> pendiente(s) de envío</span>
+      <button v-if="pendientes() && sunat.puedeEnviar" class="btn-secundario min-h-8 px-3 text-xs" :disabled="enviando" @click="enviarPendientes">Enviar a SUNAT</button>
+      <button v-if="sunat.porEstado.RECHAZADO" class="ml-auto font-medium text-red-700 hover:underline" @click="filtros.estadoSunat = 'RECHAZADO'">
+        {{ sunat.porEstado.RECHAZADO }} rechazado(s) por SUNAT: revisar
+      </button>
+      <span v-if="sunat.ambiente === 'PRUEBAS'" class="insignia ml-auto bg-indigo-50 text-indigo-700">Ambiente de pruebas{{ sunat.proveedor === 'SIMULADO' ? ' (simulado)' : '' }}</span>
+    </div>
+  </template>
+  <div class="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_11rem_9rem_11rem_auto]">
     <CampoBusqueda v-model="filtros.q" placeholder="Número, cliente o documento" />
     <select v-model="filtros.tipo" class="input">
       <option value="">Todos los tipos</option>
@@ -56,6 +92,10 @@ const accionesFila = (f) => [
       <option value="">Todos</option>
       <option value="EMITIDO">Emitidos</option>
       <option value="ANULADO">Anulados</option>
+    </select>
+    <select v-model="filtros.estadoSunat" class="input" aria-label="Estado en SUNAT">
+      <option value="">Todo estado SUNAT</option>
+      <option v-for="k in ['PENDIENTE', 'ENVIADO', 'ACEPTADO', 'OBSERVADO', 'RECHAZADO', 'ANULADO']" :key="k" :value="k">{{ ESTADOS_SUNAT[k].corto }}</option>
     </select>
     <BotonColumnas :columnas="columnas" />
   </div>
@@ -71,6 +111,7 @@ const accionesFila = (f) => [
         Crédito · {{ Number(fila.saldoPendiente) > 0 ? `debe ${soles(fila.saldoPendiente)}` : 'pagado' }}
       </span>
     </template>
+    <template #celda-estadoSunat="{ fila }"><InsigniaSunat v-if="fila.tipo !== 'NOTA_VENTA'" :estado="fila.estadoSunat" corto /><span v-else class="text-xs text-slate-400">Interno</span></template>
     <template #celda-estado="{ fila }">
       <span class="insignia" :class="estiloEstado(fila)">{{ fila.estado === 'ANULADO' ? 'Anulado' : 'Emitido' }}</span>
       <span v-if="fila.estadoSunat === 'PENDIENTE'" class="insignia ml-1 bg-amber-50 text-amber-700">SUNAT pendiente</span>

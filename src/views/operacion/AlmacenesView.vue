@@ -1,4 +1,5 @@
 <script setup>
+import { confirmar } from '@/utils/dialogos';
 import { onMounted, reactive, ref, watch } from 'vue';
 import { api, mensajeError } from '@/services/api';
 import { useAuth } from '@/stores/auth';
@@ -76,7 +77,7 @@ async function guardar() {
 }
 
 async function eliminar(fila) {
-  if (!confirm(`¿Eliminar el almacén "${fila.nombre}"?`)) return;
+  if (!(await confirmar({ titulo: `¿Eliminar el almacén ${fila.nombre}?`, texto: 'Solo se puede eliminar si no tiene stock ni movimientos.', confirmar: 'Eliminar almacén', peligro: true }))) return;
   try {
     await api.delete(`/almacenes/${fila.id}`);
     toast.exito('Almacén eliminado');

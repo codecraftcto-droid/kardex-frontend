@@ -14,6 +14,7 @@ const opciones = [
   { to: '/plataforma/estudios', etiqueta: 'Estudios', icono: 'empresa' },
   { to: '/plataforma/planes', etiqueta: 'Planes', icono: 'productos' },
   { to: '/plataforma/facturacion', etiqueta: 'Facturación', icono: 'reportes' },
+  { to: '/plataforma/cronograma', etiqueta: 'Cronograma SUNAT', icono: 'calendario' },
   { to: '/plataforma/auditoria', etiqueta: 'Auditoría', icono: 'auditoria' },
 ];
 const activo = (to) => (to === '/plataforma' ? route.path === '/plataforma' : route.path.startsWith(to));

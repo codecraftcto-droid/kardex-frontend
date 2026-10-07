@@ -44,3 +44,19 @@
   }
   select.input:disabled { background-image: none; padding-right: 0.75rem; }
 }
+
+/* ── Diálogos de confirmación (SweetAlert2) con el diseño del sistema ── */
+.swal2-container { z-index: 60; padding: 1rem; }
+.swal2-container.swal2-backdrop-show { background: rgb(15 23 42 / 0.5); }
+.dialogo.swal2-popup { width: min(28rem, 100%); border-radius: 1rem; padding: 1.5rem 1.25rem 1.25rem; font-family: inherit; }
+.dialogo .swal2-icon { margin: 0.25rem auto 0.75rem; transform: scale(0.75); }
+.dialogo-titulo.swal2-title { padding: 0 0.5rem; font-size: 1.125rem; font-weight: 600; color: #0f172a; }
+.dialogo-texto.swal2-html-container { margin: 0.5rem 0.5rem 0; font-size: 0.875rem; line-height: 1.5; color: #475569; }
+.dialogo-acciones.swal2-actions { width: 100%; margin-top: 1.25rem; gap: 0.5rem; flex-wrap: nowrap; }
+.dialogo-acciones.swal2-actions > button { flex: 1; margin: 0; }
+.dialogo .swal2-input-label { justify-content: flex-start; font-size: 0.875rem; color: #334155; }
+.dialogo .input.swal2-input { margin: 0.75rem 0 0; width: 100%; box-shadow: none; }
+.dialogo-validacion.swal2-validation-message { margin: 0.5rem 0 0; background: #fef2f2; color: #b91c1c; font-size: 0.8125rem; border-radius: 0.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  .swal2-popup, .swal2-icon, .swal2-container { animation: none !important; transition: none !important; }
+}

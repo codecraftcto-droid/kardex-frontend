@@ -1,4 +1,5 @@
 <script setup>
+import { confirmar } from '@/utils/dialogos';
 import { onMounted, reactive, ref, watch } from 'vue';
 import { api, mensajeError } from '@/services/api';
 import { useAuth } from '@/stores/auth';
@@ -39,14 +40,14 @@ async function cargarResponsables() {
   responsables.value = data.datos;
 }
 
-const vacio = () => ({ nombre: '', direccion: '', responsableId: '', activo: true });
+const vacio = () => ({ nombre: '', direccion: '', ubigeo: '', codigoEstablecimiento: '', responsableId: '', activo: true });
 const modal = reactive({ abierto: false, id: null, guardando: false, form: vacio() });
 
 function abrir(fila) {
   cargarResponsables();
   modal.id = fila?.id ?? null;
   modal.form = fila
-    ? { nombre: fila.nombre, direccion: fila.direccion ?? '', responsableId: fila.responsableId ?? '', activo: fila.activo }
+    ? { nombre: fila.nombre, direccion: fila.direccion ?? '', ubigeo: fila.ubigeo ?? '', codigoEstablecimiento: fila.codigoEstablecimiento ?? '', responsableId: fila.responsableId ?? '', activo: fila.activo }
     : vacio();
   if (fila?.responsable && !responsables.value.some((r) => r.id === fila.responsable.id)) responsables.value.push(fila.responsable);
   modal.abierto = true;
@@ -72,7 +73,7 @@ async function guardar() {
 }
 
 async function eliminar(fila) {
-  if (!confirm(`¿Eliminar la sede "${fila.nombre}"?`)) return;
+  if (!(await confirmar({ titulo: `¿Eliminar la sede ${fila.nombre}?`, texto: 'Solo se puede eliminar si no tiene almacenes.', confirmar: 'Eliminar sede', peligro: true }))) return;
   try {
     await api.delete(`/sedes/${fila.id}`);
     toast.exito('Sede eliminada');
@@ -114,6 +115,17 @@ const accionesFila = (f) => [
       <div>
         <label class="etiqueta" for="dir">Dirección</label>
         <input id="dir" v-model="modal.form.direccion" class="input" />
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label class="etiqueta" for="ubi">Ubigeo (INEI)</label>
+          <input id="ubi" v-model="modal.form.ubigeo" class="input font-mono" inputmode="numeric" maxlength="6" pattern="\d{6}" placeholder="150101" />
+        </div>
+        <div>
+          <label class="etiqueta" for="est">Cód. establecimiento SUNAT</label>
+          <input id="est" v-model="modal.form.codigoEstablecimiento" class="input font-mono" inputmode="numeric" maxlength="4" pattern="\d{4}" placeholder="0000" />
+        </div>
+        <p class="text-xs text-slate-500 sm:col-span-2">Se usan como punto de partida o llegada en las guías de remisión. 0000 = domicilio fiscal; los anexos tienen su código en la ficha RUC.</p>
       </div>
       <div v-if="responsables.length">
         <label class="etiqueta" for="resp">Responsable</label>

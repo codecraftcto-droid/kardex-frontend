@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, mensajeError } from '@/services/api';
 import { useToast } from '@/stores/toast';
+import { useAuth } from '@/stores/auth';
 import { useTiempoReal } from '@/composables/useTiempoReal';
 import { cant, fechaHora, num, soles } from '@/utils/formato';
 import { ESTADOS_TRANSFERENCIA } from '@/utils/kardex';
@@ -14,6 +15,9 @@ const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 const t = ref(null);
+const auth = useAuth();
+// La guía acompaña el traslado: se emite al aprobar o despachar (también después, si faltó)
+const puedeGuia = computed(() => t.value && ['APROBADA', 'DESPACHADA', 'RECIBIDA'].includes(t.value.estado) && auth.canEnEmpresa('gre.guia.crear', t.value.empresaId));
 const enviando = ref(false);
 
 async function cargar() {
@@ -100,6 +104,7 @@ const diferenciaRecepcion = computed(() =>
       <button v-if="t.acciones.recibir" class="btn-primario" @click="abrir('recibir')"><Icono nombre="entrada" /> Recibir</button>
       <button v-if="t.acciones.rechazar" class="btn-secundario text-red-600" @click="abrir('rechazar')">Rechazar</button>
       <button v-if="t.acciones.cancelar" class="btn-secundario" @click="abrir('cancelar')">Cancelar</button>
+      <RouterLink v-if="puedeGuia" :to="`/guias/nueva?desde=transferencia&id=${t.id}`" class="btn-secundario"><Icono nombre="transferencias" clase="size-4" /> Emitir guía de remisión</RouterLink>
     </EncabezadoPagina>
 
     <div class="grid gap-5 lg:grid-cols-[1fr_20rem]">

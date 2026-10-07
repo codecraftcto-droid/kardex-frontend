@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
+import { usarHojaImpresion } from '@/utils/impresion';
 import { api, mensajeError } from '@/services/api';
 import { fecha, fechaHora, num } from '@/utils/formato';
 import { MEDIOS_PAGO, TIPOS_DOCUMENTO } from '@/utils/pos';
@@ -10,14 +11,10 @@ const route = useRoute();
 const ticket = computed(() => route.params.formato === 'ticket');
 const k = ref(null);
 const error = ref('');
-let estilo;
+let quitarHoja;
 
 onMounted(async () => {
-  estilo = document.createElement('style');
-  estilo.textContent = ticket.value
-    ? '@page { size: 80mm auto; margin: 0 } body { background: #fff !important }'
-    : '@page { size: A4; margin: 15mm } body { background: #fff !important }';
-  document.head.appendChild(estilo);
+  quitarHoja = usarHojaImpresion(ticket.value, '15mm');
   try {
     k.value = (await api.get(`/cxc/cobranzas/${route.params.id}`)).data;
     document.title = `Recibo de cobranza Nº ${k.value.numero}`;
@@ -27,7 +24,7 @@ onMounted(async () => {
     error.value = mensajeError(e, 'No se pudo cargar la cobranza');
   }
 });
-onBeforeUnmount(() => estilo?.remove());
+onBeforeUnmount(() => quitarHoja?.());
 const imprimir = () => window.print();
 const cerrar = () => window.close();
 const empresa = computed(() => k.value?.empresa.nombreComercial || k.value?.empresa.razonSocial);

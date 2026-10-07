@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
+import { usarHojaImpresion } from '@/utils/impresion';
 import { api, mensajeError } from '@/services/api';
 import { fechaHora, num } from '@/utils/formato';
 import { MEDIOS_PAGO, TIPOS_COMPROBANTE } from '@/utils/pos';
@@ -10,17 +11,13 @@ const route = useRoute();
 const ticket = computed(() => route.params.formato === 'ticket');
 const s = ref(null);
 const error = ref('');
-let estilo;
+let quitarHoja;
 
 const diferencia = computed(() => (s.value?.diferencia == null ? null : Number(s.value.diferencia)));
 const textoDif = computed(() => (diferencia.value === 0 ? 'Cuadra' : diferencia.value < 0 ? 'Faltante' : 'Sobrante'));
 
 onMounted(async () => {
-  estilo = document.createElement('style');
-  estilo.textContent = ticket.value
-    ? '@page { size: 80mm auto; margin: 0 } body { background: #fff !important }'
-    : '@page { size: A4; margin: 15mm } body { background: #fff !important }';
-  document.head.appendChild(estilo);
+  quitarHoja = usarHojaImpresion(ticket.value, '15mm');
   try {
     s.value = (await api.get(`/pos/sesiones/${route.params.id}`)).data;
     document.title = `Cierre de caja — ${s.value.caja.nombre}`;
@@ -30,7 +27,7 @@ onMounted(async () => {
     error.value = mensajeError(e, 'No se pudo cargar el turno');
   }
 });
-onBeforeUnmount(() => estilo?.remove());
+onBeforeUnmount(() => quitarHoja?.());
 const imprimir = () => window.print();
 const cerrar = () => window.close();
 </script>

@@ -1,4 +1,5 @@
 <script setup>
+import { confirmar } from '@/utils/dialogos';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { api, mensajeError } from '@/services/api';
 import { useAuth } from '@/stores/auth';
@@ -16,6 +17,7 @@ import InsigniaEstado from '@/components/InsigniaEstado.vue';
 import Icono from '@/components/Icono.vue';
 import MenuAcciones from '@/components/MenuAcciones.vue';
 import BotonColumnas from '@/components/BotonColumnas.vue';
+import { DETRACCIONES } from '@/utils/pos';
 
 const auth = useAuth();
 const contexto = useContexto();
@@ -57,7 +59,7 @@ const columnas = [
   { clave: 'activo', titulo: 'Estado' },
 ];
 
-const vacio = () => ({ sku: '', nombre: '', codigoBarras: '', categoriaId: '', unidadId: unidades.value.find((u) => u.codigo === 'NIU')?.id || '', precioReferencial: '', afectacionIgv: '10', descripcion: '', activo: true });
+const vacio = () => ({ sku: '', nombre: '', codigoBarras: '', categoriaId: '', unidadId: unidades.value.find((u) => u.codigo === 'NIU')?.id || '', precioReferencial: '', afectacionIgv: '10', detraccionCodigo: '', descripcion: '', activo: true });
 const modal = reactive({ abierto: false, id: null, guardando: false, form: vacio(), nuevaCategoria: '' });
 
 function abrir(fila) {
@@ -66,7 +68,7 @@ function abrir(fila) {
   modal.form = fila
     ? {
         sku: fila.sku, nombre: fila.nombre, codigoBarras: fila.codigoBarras ?? '', categoriaId: fila.categoriaId ?? '',
-        unidadId: fila.unidadId, precioReferencial: fila.precioReferencial ?? '', afectacionIgv: fila.afectacionIgv ?? '10', descripcion: fila.descripcion ?? '', activo: fila.activo,
+        unidadId: fila.unidadId, precioReferencial: fila.precioReferencial ?? '', afectacionIgv: fila.afectacionIgv ?? '10', detraccionCodigo: fila.detraccionCodigo ?? '', descripcion: fila.descripcion ?? '', activo: fila.activo,
       }
     : vacio();
   modal.abierto = true;
@@ -87,7 +89,7 @@ async function crearCategoria() {
 async function guardar() {
   modal.guardando = true;
   try {
-    const datos = { ...modal.form, precioReferencial: modal.form.precioReferencial === '' ? null : modal.form.precioReferencial };
+    const datos = { ...modal.form, precioReferencial: modal.form.precioReferencial === '' ? null : modal.form.precioReferencial, detraccionCodigo: modal.form.detraccionCodigo || null };
     if (modal.id) await api.put(`/productos/${modal.id}`, datos);
     else {
       delete datos.activo;
@@ -104,7 +106,7 @@ async function guardar() {
 }
 
 async function eliminar(fila) {
-  if (!confirm(`¿Eliminar "${fila.nombre}"?`)) return;
+  if (!(await confirmar({ titulo: `¿Eliminar ${fila.nombre}?`, texto: 'Solo se puede eliminar si no tiene movimientos; si los tiene, desactívelo.', confirmar: 'Eliminar producto', peligro: true }))) return;
   try {
     await api.delete(`/productos/${fila.id}`);
     toast.exito('Producto eliminado');
@@ -185,6 +187,14 @@ const accionesFila = (f) => [
           <option value="20">Exonerado</option>
           <option value="30">Inafecto</option>
         </select>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="etiqueta" for="detr">Detracción (SPOT)</label>
+        <select id="detr" v-model="modal.form.detraccionCodigo" class="input">
+          <option value="">No sujeto a detracción</option>
+          <option v-for="(d, k) in DETRACCIONES" :key="k" :value="k">{{ k }} · {{ d.nombre }} ({{ d.porcentaje }}%)</option>
+        </select>
+        <p class="mt-1 text-xs text-slate-500">En facturas de más de S/ 700, el cliente deposita este porcentaje en su cuenta del Banco de la Nación.</p>
       </div>
       <div class="sm:col-span-2">
         <label class="etiqueta" for="cat">Categoría</label>

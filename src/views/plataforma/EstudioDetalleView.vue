@@ -1,4 +1,5 @@
 <script setup>
+import { confirmar } from '@/utils/dialogos';
 import { onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { apiPlataforma } from '@/services/apiPlataforma';
@@ -48,10 +49,19 @@ const porcentaje = (u) => (u.maximo ? Math.min(100, Math.round((u.usados / u.max
 const nombres = { empresas: 'Empresas', usuarios: 'Usuarios', almacenes: 'Almacenes' };
 
 // ── Edición (ADMIN) ──
+// ── Módulos: los del plan + los contratados aparte ──
+const modulos = ref([]);
+apiPlataforma.get('/modulos').then(({ data }) => (modulos.value = data)).catch(() => {});
+const nombreModulo = (c) => modulos.value.find((m) => m.codigo === c)?.nombre ?? c;
+const incluidoEnPlan = (c) => {
+  const plan = planes.value.find((p) => p.id === edicion.form.planId);
+  return Boolean(plan?.modulos?.includes(c));
+};
+
 const edicion = reactive({ abierto: false, form: {} });
 function abrirEdicion() {
-  const { nombre, ruc, emailContacto, telefonoContacto, planId } = e.value;
-  edicion.form = { nombre, ruc: ruc ?? '', emailContacto: emailContacto ?? '', telefonoContacto: telefonoContacto ?? '', planId: planId ?? '' };
+  const { nombre, ruc, emailContacto, telefonoContacto, planId, modulosAdicionales } = e.value;
+  edicion.form = { nombre, ruc: ruc ?? '', emailContacto: emailContacto ?? '', telefonoContacto: telefonoContacto ?? '', planId: planId ?? '', modulosAdicionales: [...(modulosAdicionales ?? [])] };
   edicion.abierto = true;
 }
 const guardar = () =>
@@ -69,15 +79,16 @@ const suspender = () =>
     suspension.abierto = false;
     return r;
   }, (d) => `Estudio suspendido; ${d.sesionesCerradas} sesión(es) cerradas`);
-const reactivar = () => confirm('¿Reactivar el estudio? Sus usuarios podrán volver a ingresar.') && accion(() => apiPlataforma.post(`/estudios/${e.value.id}/reactivar`), 'Estudio reactivado');
+const reactivar = async () =>
+  (await confirmar({ titulo: '¿Reactivar el estudio?', texto: 'Sus usuarios podrán volver a ingresar.', confirmar: 'Reactivar' })) && accion(() => apiPlataforma.post(`/estudios/${e.value.id}/reactivar`), 'Estudio reactivado');
 
 // ── Soporte ──
 const reenviar = (u) => accion(() => apiPlataforma.post(`/estudios/${e.value.id}/usuarios/${u.id}/reenviar-invitacion`), (d) => d.mensaje);
-const restablecer2fa = (u) =>
-  confirm(`¿Restablecer la verificación en dos pasos de ${u.email}? Se cerrarán sus sesiones.`) &&
+const restablecer2fa = async (u) =>
+  (await confirmar({ titulo: '¿Restablecer la verificación en dos pasos?', texto: `De ${u.email}. Se cerrarán sus sesiones y deberá configurarla de nuevo.`, confirmar: 'Restablecer', peligro: true })) &&
   accion(() => apiPlataforma.post(`/estudios/${e.value.id}/usuarios/${u.id}/restablecer-2fa`), (d) => d.mensaje);
-const cerrarSesiones = () =>
-  confirm('¿Cerrar todas las sesiones de este estudio?') &&
+const cerrarSesiones = async () =>
+  (await confirmar({ titulo: '¿Cerrar todas las sesiones del estudio?', texto: 'Todos sus usuarios tendrán que volver a ingresar.', confirmar: 'Cerrar sesiones', peligro: true })) &&
   accion(() => apiPlataforma.post(`/estudios/${e.value.id}/cerrar-sesiones`), (d) => `${d.sesionesCerradas} sesión(es) cerradas`);
 </script>
 
@@ -106,6 +117,11 @@ const cerrarSesiones = () =>
         <div class="mb-3 flex items-center justify-between">
           <h2 class="font-semibold">Plan {{ e.plan?.nombre ?? '(sin plan)' }}</h2>
           <span v-if="e.plan" class="text-sm text-slate-500">{{ soles(e.plan.precioMensual) }} / mes</span>
+        </div>
+        <div class="mb-4 flex flex-wrap gap-1.5">
+          <span v-for="m in e.modulos" :key="m" class="insignia" :class="e.plan?.modulos?.includes(m) ? 'bg-marca-50 text-marca-800' : 'bg-indigo-50 text-indigo-700'">
+            {{ nombreModulo(m) }}<template v-if="!e.plan?.modulos?.includes(m) && e.plan"> · adicional</template>
+          </span>
         </div>
         <div class="space-y-3">
           <div v-for="(u, k) in e.uso" :key="k">
@@ -176,6 +192,21 @@ const cerrarSesiones = () =>
           </select>
           <p class="mt-1 text-xs text-slate-500">Si el nuevo plan tiene límites menores al uso actual, no se borra nada: solo se impide crear más.</p>
         </div>
+        <fieldset class="sm:col-span-2">
+          <legend class="etiqueta">Módulos adicionales (aparte del plan)</legend>
+          <div class="grid gap-2 sm:grid-cols-2">
+            <label
+              v-for="m in modulos"
+              :key="m.codigo"
+              class="flex items-center gap-2.5 rounded-lg border border-slate-200 p-2.5 text-sm"
+              :class="incluidoEnPlan(m.codigo) ? 'opacity-60' : 'cursor-pointer hover:border-slate-300'"
+            >
+              <input v-model="edicion.form.modulosAdicionales" type="checkbox" :value="m.codigo" class="size-4 accent-marca-700" :disabled="incluidoEnPlan(m.codigo)" />
+              {{ m.nombre }}
+              <span v-if="incluidoEnPlan(m.codigo)" class="ml-auto text-xs text-slate-500">en el plan</span>
+            </label>
+          </div>
+        </fieldset>
       </form>
       <template #pie>
         <button class="btn-secundario" @click="edicion.abierto = false">Cancelar</button>

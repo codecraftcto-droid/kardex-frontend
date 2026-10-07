@@ -24,7 +24,7 @@ const puedeCredito = computed(() => auth.canEnEmpresa('clientes.credito.configur
 
 const vacio = () => ({
   tipoDocumento: 'DNI', numeroDocumento: '', nombre: '', direccion: '', email: '', telefono: '', rucAsociado: '',
-  creditoHabilitado: false, limiteCredito: '', diasCredito: 30, activo: true,
+  creditoHabilitado: false, limiteCredito: '', diasCredito: 30, agenteRetencion: false, activo: true,
 });
 const f = reactive(vacio());
 const consulta = reactive({ cargando: false, aviso: '' });
@@ -68,6 +68,7 @@ async function consultar() {
     const { data } = await api.get('/clientes/consulta', { params: { empresaId: props.empresaId, tipo: f.tipoDocumento, numero: f.numeroDocumento.trim() } });
     f.nombre = data.nombre;
     if (data.direccion) f.direccion = data.direccion;
+    if (data.tipoDocumento === 'RUC') f.agenteRetencion = Boolean(data.agenteRetencion);
     if (data.tipoDocumento === 'RUC' && (data.estado && data.estado !== 'ACTIVO' || data.condicion && data.condicion !== 'HABIDO')) {
       consulta.aviso = `Contribuyente ${data.estado || ''} ${data.condicion || ''}: SUNAT podría observar la factura.`;
     }
@@ -138,6 +139,10 @@ async function guardar() {
       </div>
       <div><label class="etiqueta" for="cl-em">Correo</label><input id="cl-em" v-model="f.email" type="email" class="input" /></div>
       <div><label class="etiqueta" for="cl-tel">Teléfono</label><input id="cl-tel" v-model="f.telefono" type="tel" class="input" /></div>
+      <label v-if="f.tipoDocumento === 'RUC'" class="flex min-h-10 items-start gap-3 text-sm sm:col-span-2">
+        <input v-model="f.agenteRetencion" type="checkbox" class="mt-0.5 size-5 accent-marca-700" />
+        <span>Agente de retención del IGV <span class="block text-xs text-slate-500">En facturas de más de S/ 700 retiene el 3%: el sistema cobra el neto.</span></span>
+      </label>
       <fieldset v-if="puedeCredito" class="grid gap-3 rounded-lg border border-slate-200 p-3 sm:col-span-2 sm:grid-cols-3">
         <legend class="px-1 text-sm font-medium">Crédito</legend>
         <label class="flex min-h-11 items-center gap-2 text-sm sm:col-span-3"><input v-model="f.creditoHabilitado" type="checkbox" class="size-5 accent-marca-700" /> Puede comprar al crédito</label>

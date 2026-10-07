@@ -6,7 +6,7 @@ import { useContexto } from '@/stores/contexto';
 import { useToast } from '@/stores/toast';
 import { useTiempoReal } from '@/composables/useTiempoReal';
 import { cant, fechaHora, soles } from '@/utils/formato';
-import { MEDIOS_PAGO, TIPOS_COMPROBANTE, TIPOS_DOCUMENTO, UMBRAL_BOLETA, cuotasIguales, descuentoLinea, numeroCompleto, totales } from '@/utils/pos';
+import { MEDIOS_PAGO, TIPOS_COMPROBANTE, TIPOS_DOCUMENTO, UMBRAL_BOLETA, calcularSpot, cuotasIguales, descuentoLinea, numeroCompleto, totales } from '@/utils/pos';
 import BuscadorProducto from '@/components/BuscadorProducto.vue';
 import BaseModal from '@/components/BaseModal.vue';
 import FormCliente from '@/components/FormCliente.vue';
@@ -101,7 +101,16 @@ const avisoCliente = computed(() => {
   if (tipo.value === 'BOLETA' && !cliente.value && t.value.total >= UMBRAL_BOLETA) return `Boleta desde S/ ${UMBRAL_BOLETA}: identifique al comprador`;
   return '';
 });
-const puedeCobrar = computed(() => items.value.length && t.value.total > 0 && !avisoCliente.value && !items.value.some((i) => excede(i) || sinPrecio(i) || descuentoExcede(i)));
+// Detracción (SPOT) o retención del IGV: el cliente paga el neto
+const spot = computed(() => calcularSpot({
+  tipo: tipo.value, total: t.value.total, igv: t.value.igv,
+  codigos: items.value.map((i) => i.producto.detraccionCodigo).filter(Boolean),
+  clienteAgenteRetencion: Boolean(cliente.value?.agenteRetencion),
+  empresaExceptuada: Boolean(caja.value?.empresa?.exceptuadoRetencion),
+}));
+const aCobrar = computed(() => spot.value.aCobrar);
+const faltaCuentaDetraccion = computed(() => spot.value.detraccion && !caja.value?.empresa?.cuentaDetracciones);
+const puedeCobrar = computed(() => items.value.length && t.value.total > 0 && !avisoCliente.value && !faltaCuentaDetraccion.value && !items.value.some((i) => excede(i) || sinPrecio(i) || descuentoExcede(i)));
 
 // Búsqueda de clientes
 const busquedaCliente = ref('');
@@ -147,9 +156,9 @@ const cobro = reactive({ abierto: false, forma: 'CONTADO', pagos: [], enviando: 
 const esCredito = computed(() => cobro.forma === 'CREDITO');
 const pagado = computed(() => cobro.pagos.reduce((s, p) => s + Number(p.monto || 0), 0));
 const noEfectivo = computed(() => cobro.pagos.filter((p) => p.medio !== 'EFECTIVO').reduce((s, p) => s + Number(p.monto || 0), 0));
-const falta = computed(() => Math.max(0, Math.round((t.value.total - pagado.value) * 100) / 100));
-const vuelto = computed(() => (esCredito.value || noEfectivo.value > t.value.total ? 0 : Math.max(0, Math.round((pagado.value - t.value.total) * 100) / 100)));
-const financiado = computed(() => Math.round((t.value.total - pagado.value) * 100) / 100);
+const falta = computed(() => Math.max(0, Math.round((aCobrar.value - pagado.value) * 100) / 100));
+const vuelto = computed(() => (esCredito.value || noEfectivo.value > aCobrar.value ? 0 : Math.max(0, Math.round((pagado.value - aCobrar.value) * 100) / 100)));
+const financiado = computed(() => Math.round((aCobrar.value - pagado.value) * 100) / 100);
 const sumaCuotas = computed(() => Math.round(cobro.cuotas.reduce((s, c) => s + Number(c.monto || 0), 0) * 100) / 100);
 const errorCobro = computed(() => {
   if (esCredito.value) {
@@ -159,7 +168,7 @@ const errorCobro = computed(() => {
     if (sumaCuotas.value !== financiado.value) return `Las cuotas suman ${soles(sumaCuotas.value)} y deben sumar ${soles(financiado.value)}`;
     return '';
   }
-  if (noEfectivo.value > t.value.total + 0.001) return 'Tarjeta, Yape, Plin y transferencia no pueden superar el total';
+  if (noEfectivo.value > aCobrar.value + 0.001) return 'Tarjeta, Yape, Plin y transferencia no pueden superar el total';
   if (falta.value > 0) return `Falta cobrar ${soles(falta.value)}`;
   return '';
 });
@@ -167,12 +176,12 @@ const RAPIDOS = [10, 20, 50, 100, 200];
 
 function abrirCobro() {
   if (!puedeCobrar.value) return;
-  Object.assign(cobro, { abierto: true, forma: 'CONTADO', credito: null, pagos: [{ medio: 'EFECTIVO', monto: String(t.value.total.toFixed(2)), referencia: '' }] });
+  Object.assign(cobro, { abierto: true, forma: 'CONTADO', credito: null, pagos: [{ medio: 'EFECTIVO', monto: String(aCobrar.value.toFixed(2)), referencia: '' }] });
 }
 async function cambiarForma(forma) {
   cobro.forma = forma;
   if (forma === 'CONTADO') {
-    cobro.pagos = [{ medio: 'EFECTIVO', monto: String(t.value.total.toFixed(2)), referencia: '' }];
+    cobro.pagos = [{ medio: 'EFECTIVO', monto: String(aCobrar.value.toFixed(2)), referencia: '' }];
     return;
   }
   // Crédito: sin inicial por defecto; cuotas según el plazo del cliente
@@ -193,11 +202,11 @@ watch(() => [cobro.nCuotas, financiado.value], () => esCredito.value && regenera
 function agregarMedio(medio) {
   // Si solo está el efectivo sugerido por el total (sin tocar), elegir otro medio lo reemplaza
   const [unico] = cobro.pagos;
-  if (!esCredito.value && cobro.pagos.length === 1 && unico.medio === 'EFECTIVO' && Number(unico.monto) === t.value.total && medio !== 'EFECTIVO') {
-    cobro.pagos = [{ medio, monto: t.value.total.toFixed(2), referencia: '' }];
+  if (!esCredito.value && cobro.pagos.length === 1 && unico.medio === 'EFECTIVO' && Number(unico.monto) === aCobrar.value && medio !== 'EFECTIVO') {
+    cobro.pagos = [{ medio, monto: aCobrar.value.toFixed(2), referencia: '' }];
     return;
   }
-  const restante = esCredito.value ? 0 : Math.max(0, t.value.total - pagado.value);
+  const restante = esCredito.value ? 0 : Math.max(0, aCobrar.value - pagado.value);
   cobro.pagos.push({ medio, monto: restante ? restante.toFixed(2) : '', referencia: '' });
 }
 
@@ -428,20 +437,29 @@ async function cerrarCaja() {
           <div class="flex justify-between"><dt class="text-slate-500">IGV 18%</dt><dd class="tabular-nums">{{ soles(t.igv) }}</dd></div>
           <div v-if="t.descuento" class="flex justify-between"><dt class="text-slate-500">Descuentos</dt><dd class="tabular-nums">−{{ soles(t.descuento) }}</dd></div>
           <div class="flex justify-between pt-1 text-xl font-semibold"><dt>Total</dt><dd class="tabular-nums">{{ soles(t.total) }}</dd></div>
+          <template v-if="spot.detraccion">
+            <div class="flex justify-between text-amber-800"><dt>Detracción {{ spot.detraccion.porcentaje }}% <span class="text-xs">(depósito en el Banco de la Nación)</span></dt><dd class="tabular-nums">−{{ soles(spot.detraccion.monto) }}</dd></div>
+            <div class="flex justify-between font-semibold"><dt>A cobrar</dt><dd class="tabular-nums">{{ soles(aCobrar) }}</dd></div>
+            <p v-if="faltaCuentaDetraccion" class="rounded-lg bg-red-50 px-2 py-1.5 text-xs text-red-700">Factura sujeta a detracción: registre la cuenta de detracciones de la empresa (Empresas → Editar).</p>
+          </template>
+          <template v-else-if="spot.retencion">
+            <div class="flex justify-between text-amber-800"><dt>Retención IGV 3% <span class="text-xs">(la aplica el cliente)</span></dt><dd class="tabular-nums">−{{ soles(spot.retencion) }}</dd></div>
+            <div class="flex justify-between font-semibold"><dt>A cobrar</dt><dd class="tabular-nums">{{ soles(aCobrar) }}</dd></div>
+          </template>
         </dl>
-        <button class="btn-primario mt-4 hidden min-h-14 w-full text-lg lg:flex" :disabled="!puedeCobrar" @click="abrirCobro">Cobrar {{ soles(t.total) }}</button>
+        <button class="btn-primario mt-4 hidden min-h-14 w-full text-lg lg:flex" :disabled="!puedeCobrar" @click="abrirCobro">Cobrar {{ soles(aCobrar) }}</button>
         <button v-if="items.length" class="btn-texto mt-1 w-full text-slate-500" @click="nuevaVenta">Vaciar venta</button>
       </div>
     </aside>
 
     <!-- Móvil: barra de cobro fija -->
     <div class="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 border-t border-slate-200 bg-white/95 p-3 backdrop-blur lg:hidden">
-      <button class="btn-primario min-h-14 w-full text-lg" :disabled="!puedeCobrar" @click="abrirCobro">Cobrar {{ soles(t.total) }} · {{ items.length }} ítem(s)</button>
+      <button class="btn-primario min-h-14 w-full text-lg" :disabled="!puedeCobrar" @click="abrirCobro">Cobrar {{ soles(aCobrar) }} · {{ items.length }} ítem(s)</button>
     </div>
   </div>
 
   <!-- Cobro -->
-  <BaseModal :abierto="cobro.abierto" :titulo="`Cobrar ${soles(t.total)}`" @cerrar="cobro.abierto = false">
+  <BaseModal :abierto="cobro.abierto" :titulo="`Cobrar ${soles(aCobrar)}`" @cerrar="cobro.abierto = false">
     <div class="space-y-4">
       <div v-if="caja?.acciones.credito" class="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1" role="radiogroup" aria-label="Forma de pago">
         <button v-for="f in ['CONTADO', 'CREDITO']" :key="f" role="radio" :aria-checked="cobro.forma === f" class="min-h-10 rounded-md text-sm font-medium" :class="cobro.forma === f ? 'bg-white shadow-sm' : 'text-slate-600'" @click="cambiarForma(f)">
@@ -488,6 +506,8 @@ async function cerrarCaja() {
       </div>
       <dl class="rounded-lg bg-slate-50 p-3 text-sm">
         <div class="flex justify-between"><dt>Total</dt><dd class="tabular-nums">{{ soles(t.total) }}</dd></div>
+        <div v-if="spot.detraccion || spot.retencion" class="flex justify-between text-amber-800"><dt>{{ spot.detraccion ? `Detracción ${spot.detraccion.porcentaje}%` : 'Retención IGV 3%' }}</dt><dd class="tabular-nums">−{{ soles(spot.detraccion?.monto ?? spot.retencion) }}</dd></div>
+        <div v-if="spot.detraccion || spot.retencion" class="flex justify-between font-medium"><dt>Neto a cobrar</dt><dd class="tabular-nums">{{ soles(aCobrar) }}</dd></div>
         <div v-if="esCredito" class="flex justify-between"><dt>Inicial</dt><dd class="tabular-nums">{{ soles(pagado) }}</dd></div>
         <div v-if="esCredito" class="flex justify-between text-lg font-semibold text-sky-700"><dt>Al crédito</dt><dd class="tabular-nums">{{ soles(financiado) }}</dd></div>
         <template v-if="!esCredito">

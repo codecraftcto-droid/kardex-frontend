@@ -20,7 +20,9 @@ const emit = defineEmits(['cerrar', 'guardado']);
 const toast = useToast();
 
 const cuentas = ref([]);
-const nuevaLinea = () => ({ cuenta: '', debe: '', haber: '', glosa: '', terceroDoc: '', terceroNombre: '', docSerie: '', docNumero: '', mas: false });
+const nuevaLinea = () => ({ cuenta: '', debe: '', haber: '', glosa: '', terceroDoc: '', terceroNombre: '', docTipo: '', docSerie: '', docNumero: '', mas: false });
+/** Tipos de comprobante (tabla 10 de SUNAT) más usados en asientos manuales */
+const TIPOS_COMPROBANTE = [['01', 'Factura'], ['03', 'Boleta'], ['07', 'Nota de crédito'], ['08', 'Nota de débito'], ['02', 'Recibo por honorarios'], ['14', 'Recibo de servicios públicos'], ['12', 'Ticket'], ['00', 'Otros']];
 const f = reactive({ fecha: '', glosa: '', lineas: [] });
 const guardando = ref(false);
 // El plan es de la empresa: al cambiarla se vuelve a cargar
@@ -34,7 +36,7 @@ watch(() => props.abierto, async (v) => {
       fecha: props.asiento.fecha, glosa: props.asiento.glosa,
       lineas: props.asiento.lineas.map((l) => ({
         cuenta: l.cuenta, debe: Number(l.debe) ? String(Number(l.debe)) : '', haber: Number(l.haber) ? String(Number(l.haber)) : '', glosa: l.glosa ?? '',
-        terceroDoc: l.terceroDoc ?? '', terceroNombre: l.terceroNombre ?? '', docSerie: l.docSerie ?? '', docNumero: l.docNumero ?? '', mas: Boolean(l.terceroDoc || l.docSerie),
+        terceroDoc: l.terceroDoc ?? '', terceroNombre: l.terceroNombre ?? '', docTipo: l.docTipo ?? '', docSerie: l.docSerie ?? '', docNumero: l.docNumero ?? '', mas: Boolean(l.terceroDoc || l.docSerie),
       })),
     });
   } else {
@@ -132,9 +134,13 @@ async function guardar() {
               </tr>
               <tr v-if="l.mas" class="bg-slate-50/60">
                 <td colspan="5" class="px-2 py-2">
-                  <div class="grid gap-2 sm:grid-cols-4">
+                  <div class="grid gap-2 sm:grid-cols-5">
                     <input v-model.trim="l.terceroDoc" class="input font-mono text-sm" maxlength="20" placeholder="RUC / DNI del tercero" :aria-label="`Documento del tercero, línea ${i + 1}`" />
                     <input v-model="l.terceroNombre" class="input text-sm" maxlength="200" placeholder="Nombre del tercero" :aria-label="`Nombre del tercero, línea ${i + 1}`" />
+                    <select v-model="l.docTipo" class="input text-sm" :aria-label="`Tipo de comprobante, línea ${i + 1}`">
+                      <option value="">Tipo de comprobante</option>
+                      <option v-for="[c, t] in TIPOS_COMPROBANTE" :key="c" :value="c">{{ c }} · {{ t }}</option>
+                    </select>
                     <input v-model.trim="l.docSerie" class="input font-mono text-sm uppercase" maxlength="20" placeholder="Serie del comprobante" :aria-label="`Serie del comprobante, línea ${i + 1}`" />
                     <input v-model.trim="l.docNumero" class="input font-mono text-sm" maxlength="20" placeholder="Número" :aria-label="`Número del comprobante, línea ${i + 1}`" />
                   </div>

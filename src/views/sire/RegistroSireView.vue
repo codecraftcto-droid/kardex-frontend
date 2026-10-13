@@ -1,4 +1,5 @@
 <script setup>
+import Pestanas from '@/components/Pestanas.vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, mensajeError } from '@/services/api';
@@ -274,19 +275,7 @@ const signo = (x) => (x.tipoCp === '07' ? '−' : '');
   </template>
 
   <!-- Pestañas -->
-  <div class="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200" role="tablist">
-    <button
-      v-for="[k, t] in [['diferencias', 'Diferencias'], ['sunat', 'Propuesta SUNAT'], ['sistema', TXT.sistema]]"
-      :key="k"
-      role="tab"
-      :aria-selected="vista === k"
-      class="-mb-px min-h-11 border-b-2 px-3 text-sm font-medium whitespace-nowrap"
-      :class="vista === k ? 'border-marca-700 text-marca-700' : 'border-transparent text-slate-500 hover:text-slate-700'"
-      @click="irA(k)"
-    >
-      {{ t }}
-    </button>
-  </div>
+  <Pestanas :opciones="[['diferencias', 'Diferencias'], ['sunat', 'Propuesta SUNAT'], ['sistema', TXT.sistema]]" :activa="vista" @cambiar="irA" />
 
   <!-- Diferencias -->
   <template v-if="vista === 'diferencias'">

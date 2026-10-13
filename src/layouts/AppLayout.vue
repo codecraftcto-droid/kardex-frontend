@@ -6,12 +6,13 @@ import { useContexto } from '@/stores/contexto';
 import { obtenerSocket } from '@/services/socket';
 import Icono from '@/components/Icono.vue';
 import SelectorEmpresa from '@/components/SelectorEmpresa.vue';
+import SelectorPeriodo from '@/components/SelectorPeriodo.vue';
 import PaletaComandos from '@/components/PaletaComandos.vue';
 import { useToast } from '@/stores/toast';
 import { useTiempoReal } from '@/composables/useTiempoReal';
 import { cant } from '@/utils/formato';
 import { ESTADOS_TRANSFERENCIA } from '@/utils/kardex';
-import { PERMISOS_REPORTES } from '@/router';
+import { ACCIONES, navegacionVisible, paginaDe, puedeVer } from '@/router/navegacion';
 import { useInstalacion } from '@/composables/useInstalacion';
 import { useExportaciones } from '@/stores/exportaciones';
 
@@ -20,53 +21,21 @@ const route = useRoute();
 const router = useRouter();
 const contexto = useContexto();
 
-// Menú dinámico: cada opción declara el permiso que la habilita (sin roles en el código)
-const opciones = [
-  { to: '/', etiqueta: 'Inicio', icono: 'inicio' },
-  { to: '/inventario', etiqueta: 'Inventario', icono: 'inventario', permiso: 'kardex.stock.ver', grupo: 'Kardex' },
-  { to: '/movimientos', etiqueta: 'Movimientos', icono: 'movimientos', permiso: 'kardex.stock.ver', grupo: 'Kardex' },
-  { to: '/transferencias', etiqueta: 'Transferencias', icono: 'transferencias', permiso: 'transferencia.ver', grupo: 'Kardex' },
-  { to: '/guias', etiqueta: 'Guías de remisión', icono: 'transferencias', permiso: 'gre.guia.ver', grupo: 'Kardex' },
-  { to: '/productos', etiqueta: 'Productos', icono: 'productos', permiso: 'productos.producto.ver', grupo: 'Kardex' },
-  { to: '/kardex', etiqueta: 'Kardex por producto', icono: 'kardex', permiso: 'kardex.stock.ver', grupo: 'Kardex' },
-  { to: '/reportes', etiqueta: 'Reportes', icono: 'reportes', permisos: PERMISOS_REPORTES, grupo: 'Kardex' },
-  { to: '/pos', etiqueta: 'Caja', icono: 'caja', permiso: 'pos.venta.crear', grupo: 'Punto de venta' },
-  { to: '/comprobantes', etiqueta: 'Comprobantes', icono: 'comprobante', permiso: 'pos.venta.ver', grupo: 'Punto de venta' },
-  { to: '/clientes', etiqueta: 'Clientes', icono: 'usuarios', permiso: 'clientes.cliente.ver', grupo: 'Punto de venta' },
-  { to: '/cuentas-por-cobrar', etiqueta: 'Cuentas por cobrar', icono: 'tarjeta', permiso: 'cxc.cuenta.ver', grupo: 'Punto de venta' },
-  { to: '/cajas', etiqueta: 'Cajas y turnos', icono: 'kardex', permisos: ['pos.caja.configurar', 'pos.caja.ver'], grupo: 'Punto de venta' },
-  { to: '/compras', etiqueta: 'Compras', icono: 'entrada', permiso: 'compras.compra.ver', grupo: 'Comercial' },
-  { to: '/ventas', etiqueta: 'Ventas', icono: 'salida', permiso: 'ventas.venta.ver', grupo: 'Comercial' },
-  { to: '/contabilidad/asientos', etiqueta: 'Asientos', icono: 'comprobante', permiso: 'contabilidad.asiento.ver', grupo: 'Contabilidad' },
-  { to: '/contabilidad/libros', etiqueta: 'Libros Diario y Mayor', icono: 'reportes', permiso: 'contabilidad.asiento.ver', grupo: 'Contabilidad' },
-  { to: '/contabilidad/estados', etiqueta: 'Estados financieros', icono: 'kardex', permiso: 'contabilidad.estados.ver', grupo: 'Contabilidad' },
-  { to: '/contabilidad/plan', etiqueta: 'Plan contable', icono: 'kardex', permiso: 'contabilidad.plan.ver', grupo: 'Contabilidad' },
-  { to: '/sire/panel', etiqueta: 'Panel SIRE', icono: 'reportes', permiso: 'sire.periodo.ver', grupo: 'SUNAT' },
-  { to: '/sire', etiqueta: 'Períodos SIRE', icono: 'calendario', permiso: 'sire.periodo.ver', grupo: 'SUNAT' },
-  { to: '/empresas', etiqueta: 'Empresas', icono: 'empresa', permiso: 'empresas.empresa.ver', grupo: 'Organización' },
-  { to: '/sedes', etiqueta: 'Sedes', icono: 'sede', permiso: 'sedes.sede.ver', grupo: 'Organización' },
-  { to: '/almacenes', etiqueta: 'Almacenes', icono: 'almacen', permiso: 'almacenes.almacen.ver', grupo: 'Organización' },
-  { to: '/usuarios', etiqueta: 'Usuarios', icono: 'usuarios', permiso: 'usuarios.usuario.ver', grupo: 'Seguridad' },
-  { to: '/roles', etiqueta: 'Roles y permisos', icono: 'roles', permiso: 'usuarios.roles.ver', grupo: 'Seguridad' },
-  { to: '/auditoria', etiqueta: 'Auditoría', icono: 'auditoria', permiso: 'auditoria.ver', grupo: 'Seguridad' },
-];
-const visibles = computed(() =>
-  opciones.filter((o) => (!o.permiso || auth.canAlguno(o.permiso)) && (!o.permisos || o.permisos.some((p) => auth.canAlguno(p)))),
-);
-// Acciones rápidas (solo para el buscador Ctrl+K)
-const ACCIONES = [
-  { to: '/pos', etiqueta: 'Nueva venta en caja', icono: 'caja', permiso: 'pos.venta.crear', grupo: 'Acción' },
-  { to: '/movimientos/entrada', etiqueta: 'Registrar entrada', icono: 'entrada', permiso: 'kardex.entrada.crear', grupo: 'Acción' },
-  { to: '/movimientos/salida', etiqueta: 'Registrar salida', icono: 'salida', permiso: 'kardex.salida.crear', grupo: 'Acción' },
-  { to: '/transferencias/nueva', etiqueta: 'Nueva transferencia', icono: 'transferencias', permiso: 'transferencia.solicitar', grupo: 'Acción' },
-  { to: '/guias/nueva', etiqueta: 'Nueva guía de remisión', icono: 'transferencias', permiso: 'gre.guia.crear', grupo: 'Acción' },
-  { to: '/compras/nueva', etiqueta: 'Registrar compra', icono: 'entrada', permiso: 'compras.compra.crear', grupo: 'Acción' },
-  { to: '/perfil', etiqueta: 'Mi perfil y sesiones', icono: 'perfil', grupo: 'Cuenta' },
-];
+// Navegación por áreas (router/navegacion.js): el menú lateral muestra las áreas y las
+// pantallas de cada área van como pestañas sobre el contenido
+const nav = computed(() => navegacionVisible(auth.canAlguno));
+const areas = computed(() => nav.value.flatMap((s) => s.areas));
+const paginaActual = computed(() => paginaDe(route.path));
+const areaActual = computed(() => areas.value.find((a) => a.id === paginaActual.value?.area) ?? null);
+const activoArea = (a) => areaActual.value?.id === a.id;
+const activoPagina = (p) => paginaActual.value?.to === p.to;
 const paleta = ref(false);
-const opcionesPaleta = computed(() => [...visibles.value, ...ACCIONES.filter((a) => !a.permiso || auth.canAlguno(a.permiso))]);
+const opcionesPaleta = computed(() => [
+  ...areas.value.flatMap((a) => a.paginas.map((p) => ({ to: p.to, etiqueta: p.etiqueta, icono: a.icono, grupo: a.etiqueta }))),
+  ...ACCIONES.filter((a) => puedeVer(a, auth.canAlguno)),
+]);
 
-// Menú lateral: grupos plegables y modo compacto (solo íconos), recordados en este navegador
+// Menú lateral: secciones plegables y modo compacto (solo íconos), recordados en este navegador
 function leer(k, porDefecto) {
   try { return JSON.parse(localStorage.getItem(k)) ?? porDefecto; } catch { return porDefecto; }
 }
@@ -75,31 +44,18 @@ function guardar(k, v) {
 }
 const compacto = ref(leer('kardex:menu-compacto', false));
 watch(compacto, (v) => guardar('kardex:menu-compacto', v));
-const plegados = ref(leer('kardex:menu-plegados', []));
-watch(plegados, (v) => guardar('kardex:menu-plegados', v), { deep: true });
-const grupos = computed(() => {
-  const lista = [];
-  for (const o of visibles.value) {
-    const g = o.grupo ?? '';
-    if (lista.at(-1)?.nombre !== g) lista.push({ nombre: g, opciones: [] });
-    lista.at(-1).opciones.push(o);
-  }
-  return lista;
-});
-const plegado = (g) => !compacto.value && plegados.value.includes(g.nombre) && !g.opciones.some((o) => activo(o.to));
-const alternarGrupo = (g) => {
-  const i = plegados.value.indexOf(g.nombre);
-  i >= 0 ? plegados.value.splice(i, 1) : plegados.value.push(g.nombre);
+const plegados = ref(leer('kardex:menu-secciones-plegadas', []));
+watch(plegados, (v) => guardar('kardex:menu-secciones-plegadas', v), { deep: true });
+const plegado = (s) => !compacto.value && plegados.value.includes(s.nombre) && !s.areas.some(activoArea);
+const alternarSeccion = (s) => {
+  const i = plegados.value.indexOf(s.nombre);
+  i >= 0 ? plegados.value.splice(i, 1) : plegados.value.push(s.nombre);
 };
-const actual = computed(() => visibles.value.filter((o) => activo(o.to)).sort((a, b) => b.to.length - a.to.length)[0]);
 const esMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
-const principales = computed(() => visibles.value.slice(0, 4));
-const secundarias = computed(() => visibles.value.slice(4));
-
-const coincide = (to) => route.path === to || route.path.startsWith(`${to}/`);
-// Activa la opción que coincide con la ruta, salvo que otra más específica también coincida (p. ej. /sire y /sire/panel)
-const activo = (to) => (to === '/' ? route.path === '/' : coincide(to) && !opciones.some((o) => o.to.length > to.length && o.to.startsWith(`${to}/`) && coincide(o.to)));
+// Móvil: las primeras cuatro áreas en la barra inferior y el resto en "Más"
+const principales = computed(() => areas.value.slice(0, 4));
+const secundarias = computed(() => areas.value.slice(4));
 const hojaAbierta = ref(false);
 const menuUsuario = ref(false);
 watch(() => route.fullPath, () => { hojaAbierta.value = false; menuUsuario.value = false; });
@@ -179,32 +135,33 @@ const iniciales = computed(() =>
       </div>
 
       <nav class="flex-1 overflow-y-auto px-3 pb-4" aria-label="Menú principal">
-        <div v-for="g in grupos" :key="g.nombre" class="mt-1">
+        <div v-for="(s, i) in nav" :key="s.nombre" class="mt-1">
           <button
-            v-if="g.nombre && !compacto"
+            v-if="i > 0 && !compacto"
             class="group mt-4 mb-1 flex w-full items-center justify-between rounded-md px-3 py-1 text-[11px] font-semibold tracking-wider text-slate-500 uppercase hover:text-slate-300"
-            :aria-expanded="!plegado(g)"
-            @click="alternarGrupo(g)"
+            :aria-expanded="!plegado(s)"
+            @click="alternarSeccion(s)"
           >
-            {{ g.nombre }}
-            <Icono nombre="abajo" clase="size-3.5 transition-transform" :class="{ '-rotate-90': plegado(g) }" />
+            {{ s.nombre }}
+            <Icono nombre="abajo" clase="size-3.5 transition-transform" :class="{ '-rotate-90': plegado(s) }" />
           </button>
-          <div v-else-if="g.nombre" class="mx-3 my-3 border-t border-white/5" />
-          <div v-show="!plegado(g)" class="space-y-0.5">
+          <div v-else-if="i > 0" class="mx-3 my-3 border-t border-white/5" />
+          <div v-show="!plegado(s)" class="space-y-0.5">
             <RouterLink
-              v-for="o in g.opciones"
-              :key="o.to"
-              :to="o.to"
-              :title="compacto ? o.etiqueta : undefined"
+              v-for="a in s.areas"
+              :key="a.id"
+              :to="a.to"
+              :title="compacto ? a.etiqueta : undefined"
               class="relative flex min-h-10 items-center gap-3 rounded-lg text-sm font-medium transition-colors"
               :class="[
                 compacto ? 'justify-center px-0' : 'px-3',
-                activo(o.to) ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100',
+                activoArea(a) ? 'bg-white/10 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100',
               ]"
             >
-              <span v-if="activo(o.to)" class="absolute inset-y-2 left-0 w-0.5 rounded-full bg-teal-400" aria-hidden="true" />
-              <Icono :nombre="o.icono" clase="size-5 shrink-0" :class="activo(o.to) ? 'text-teal-300' : ''" />
-              <span v-if="!compacto" class="truncate">{{ o.etiqueta }}</span>
+              <span v-if="activoArea(a)" class="absolute inset-y-2 left-0 w-0.5 rounded-full bg-teal-400" aria-hidden="true" />
+              <Icono :nombre="a.icono" clase="size-5 shrink-0" :class="activoArea(a) ? 'text-teal-300' : ''" />
+              <span v-if="!compacto" class="truncate">{{ a.etiqueta }}</span>
+              <span v-if="!compacto && a.paginas.length > 1" class="ml-auto text-[11px] text-slate-500 tabular-nums">{{ a.paginas.length }}</span>
             </RouterLink>
           </div>
         </div>
@@ -251,12 +208,15 @@ const iniciales = computed(() =>
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="size-5" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg>
         </button>
-        <nav v-if="actual && actual.to !== '/'" class="hidden items-center gap-1.5 text-sm xl:flex" aria-label="Ubicación">
-          <span class="text-slate-400">{{ actual.grupo }}</span>
-          <Icono nombre="abajo" clase="size-3.5 -rotate-90 text-slate-300" />
-          <span class="font-medium text-slate-700">{{ actual.etiqueta }}</span>
+        <nav v-if="areaActual && areaActual.id !== 'inicio'" class="hidden items-center gap-1.5 text-sm xl:flex" aria-label="Ubicación">
+          <span :class="areaActual.paginas.length > 1 ? 'text-slate-400' : 'font-medium text-slate-700'">{{ areaActual.etiqueta }}</span>
+          <template v-if="areaActual.paginas.length > 1">
+            <Icono nombre="abajo" clase="size-3.5 -rotate-90 text-slate-300" />
+            <span class="font-medium text-slate-700">{{ paginaActual.etiqueta }}</span>
+          </template>
         </nav>
         <div class="min-w-0 flex-1 sm:max-w-xs xl:ml-4"><SelectorEmpresa /></div>
+        <SelectorPeriodo v-if="paginaActual?.periodo" class="hidden sm:flex" />
         <span v-if="auth.esCliente" class="insignia hidden shrink-0 bg-indigo-50 text-indigo-700 md:inline-flex">Portal cliente · solo lectura</span>
         <span v-else-if="auth.usuario?.tipo === 'operador'" class="insignia hidden shrink-0 bg-amber-50 text-amber-800 md:inline-flex">Operador de caja</span>
 
@@ -306,6 +266,21 @@ const iniciales = computed(() =>
       </header>
 
       <main class="pb-barra-movil mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+        <!-- Pestañas del área: las demás pantallas del mismo tema -->
+        <nav v-if="areaActual && areaActual.paginas.length > 1" class="-mt-1 mb-5 flex gap-1 overflow-x-auto border-b border-slate-200 lg:-mt-3" :aria-label="areaActual.etiqueta">
+          <RouterLink
+            v-for="p in areaActual.paginas"
+            :key="p.to"
+            :to="p.to"
+            class="-mb-px flex min-h-11 items-center border-b-2 px-3 text-sm font-medium whitespace-nowrap transition-colors"
+            :class="activoPagina(p) ? 'border-marca-700 text-marca-700' : 'border-transparent text-slate-500 hover:text-slate-800'"
+            :aria-current="activoPagina(p) ? 'page' : undefined"
+          >
+            {{ p.etiqueta }}
+          </RouterLink>
+        </nav>
+        <!-- En móvil la cabecera no tiene espacio para el período: va sobre el contenido -->
+        <SelectorPeriodo v-if="paginaActual?.periodo" class="mb-4 sm:hidden" />
         <!-- :key = empresa activa → al cambiar de empresa la vista se recrea con datos frescos -->
         <RouterView v-slot="{ Component }">
           <component :is="Component" :key="contexto.empresaActivaId" />
@@ -318,15 +293,15 @@ const iniciales = computed(() =>
     <!-- Barra inferior (móvil/tablet) -->
     <nav class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden" aria-label="Navegación principal">
       <ul class="grid" :style="{ gridTemplateColumns: `repeat(${principales.length + (secundarias.length ? 1 : 0)}, minmax(0, 1fr))` }">
-        <li v-for="o in principales" :key="o.to">
-          <RouterLink :to="o.to" class="flex h-16 flex-col items-center justify-center gap-0.5 text-[11px] font-medium" :class="activo(o.to) ? 'text-marca-700' : 'text-slate-500'">
-            <span class="flex h-7 w-12 items-center justify-center rounded-full transition-colors" :class="activo(o.to) ? 'bg-marca-50' : ''"><Icono :nombre="o.icono" clase="size-5" /></span>
+        <li v-for="o in principales" :key="o.id">
+          <RouterLink :to="o.to" class="flex h-16 flex-col items-center justify-center gap-0.5 text-[11px] font-medium" :class="activoArea(o) ? 'text-marca-700' : 'text-slate-500'">
+            <span class="flex h-7 w-12 items-center justify-center rounded-full transition-colors" :class="activoArea(o) ? 'bg-marca-50' : ''"><Icono :nombre="o.icono" clase="size-5" /></span>
             <span class="max-w-full truncate px-1">{{ o.etiqueta }}</span>
           </RouterLink>
         </li>
         <li v-if="secundarias.length">
-          <button class="flex h-16 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium" :class="secundarias.some((o) => activo(o.to)) ? 'text-marca-700' : 'text-slate-500'" @click="hojaAbierta = true">
-            <span class="flex h-7 w-12 items-center justify-center rounded-full" :class="secundarias.some((o) => activo(o.to)) ? 'bg-marca-50' : ''"><Icono nombre="mas" clase="size-5" /></span> Más
+          <button class="flex h-16 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium" :class="secundarias.some(activoArea) ? 'text-marca-700' : 'text-slate-500'" @click="hojaAbierta = true">
+            <span class="flex h-7 w-12 items-center justify-center rounded-full" :class="secundarias.some(activoArea) ? 'bg-marca-50' : ''"><Icono nombre="mas" clase="size-5" /></span> Más
           </button>
         </li>
       </ul>
@@ -338,7 +313,7 @@ const iniciales = computed(() =>
         <div class="absolute inset-0 bg-slate-900/40" @click="hojaAbierta = false" />
         <div class="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-300" />
-          <RouterLink v-for="o in secundarias" :key="o.to" :to="o.to" class="flex min-h-12 items-center gap-3 rounded-lg px-3 font-medium" :class="activo(o.to) ? 'bg-marca-50 text-marca-700' : 'text-slate-700'">
+          <RouterLink v-for="o in secundarias" :key="o.id" :to="o.to" class="flex min-h-12 items-center gap-3 rounded-lg px-3 font-medium" :class="activoArea(o) ? 'bg-marca-50 text-marca-700' : 'text-slate-700'">
             <Icono :nombre="o.icono" /> {{ o.etiqueta }}
           </RouterLink>
         </div>

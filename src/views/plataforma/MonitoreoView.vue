@@ -4,6 +4,7 @@ import { apiPlataforma } from '@/services/apiPlataforma';
 import { mensajeError } from '@/services/api';
 import { useToast } from '@/stores/toast';
 import EncabezadoPagina from '@/components/EncabezadoPagina.vue';
+import Icono from '@/components/Icono.vue';
 
 const toast = useToast();
 const m = ref(null);
@@ -62,6 +63,65 @@ const uptime = computed(() => {
       <div class="tarjeta p-4"><p class="text-sm text-slate-500">Usuarios activos</p><p class="text-2xl font-semibold">{{ m.usuariosActivos }}</p></div>
       <div class="tarjeta p-4"><p class="text-sm text-slate-500">Sesiones abiertas</p><p class="text-2xl font-semibold">{{ m.sesionesActivas }}</p></div>
       <div class="tarjeta col-span-2 p-4 lg:col-span-1"><p class="text-sm text-slate-500">Movimientos 24 h</p><p class="text-2xl font-semibold">{{ m.movimientos.ultimas24h }}</p></div>
+    </div>
+
+    <!-- Operación SUNAT de todos los estudios -->
+    <h2 class="mb-2 text-sm font-semibold tracking-wide text-slate-500 uppercase">SUNAT · últimos 30 días</h2>
+    <div class="mb-6 grid gap-4 lg:grid-cols-2">
+      <section class="tarjeta p-4">
+        <h3 class="mb-3 font-semibold">Comprobantes electrónicos por estado</h3>
+        <div class="flex flex-wrap gap-2">
+          <span v-for="(n, estado) in m.sunat.porEstado" :key="estado" class="insignia" :class="estado === 'RECHAZADO' ? 'bg-red-50 text-red-700' : ['PENDIENTE', 'ENVIADO'].includes(estado) ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-700'">
+            {{ estado.toLowerCase() }}: {{ n }}
+          </span>
+          <span v-if="!Object.keys(m.sunat.porEstado).length" class="text-sm text-slate-500">Sin comprobantes electrónicos en el periodo</span>
+        </div>
+        <h3 class="mt-4 mb-2 text-sm font-semibold">Estudios con problemas</h3>
+        <p v-if="!m.sunat.estudiosConProblemas.length" class="flex items-center gap-2 text-sm text-emerald-700"><Icono nombre="check" clase="size-4" /> Ningún rechazo ni envío atascado</p>
+        <ul v-else class="divide-y divide-slate-100 text-sm">
+          <li v-for="e in m.sunat.estudiosConProblemas" :key="e.id" class="flex items-center justify-between gap-2 py-1.5">
+            <RouterLink :to="`/plataforma/estudios/${e.id}`" class="font-medium text-slate-800 hover:underline">{{ e.nombre }}</RouterLink>
+            <span class="flex gap-1">
+              <span v-if="e.rechazados" class="insignia bg-red-50 text-red-700">{{ e.rechazados }} rechazados</span>
+              <span v-if="e.atascados" class="insignia bg-amber-50 text-amber-800">{{ e.atascados }} sin respuesta &gt; 1 día</span>
+            </span>
+          </li>
+        </ul>
+        <template v-if="m.sunat.sireConError.length">
+          <h3 class="mt-4 mb-2 text-sm font-semibold">Conexiones SIRE con error</h3>
+          <ul class="divide-y divide-slate-100 text-sm">
+            <li v-for="(s, i) in m.sunat.sireConError" :key="i" class="py-1.5">
+              <RouterLink :to="`/plataforma/estudios/${s.estudioId}`" class="font-medium hover:underline">{{ s.estudio }}</RouterLink> · {{ s.empresa }}
+              <p class="truncate text-xs text-red-700">{{ s.error }}</p>
+            </li>
+          </ul>
+        </template>
+      </section>
+      <section class="tarjeta p-4">
+        <h3 class="mb-3 font-semibold">Colas en segundo plano</h3>
+        <div class="overflow-x-auto"><table class="min-w-full text-sm">
+          <thead class="text-xs text-slate-500"><tr><th class="py-1 text-left font-medium">Cola</th><th class="py-1 pl-3 text-right font-medium">En espera</th><th class="py-1 pl-3 text-right font-medium">Procesando</th><th class="py-1 pl-3 text-right font-medium" title="Tareas periódicas o reintentos con fecha">Programados</th><th class="py-1 pl-3 text-right font-medium">Fallidos</th></tr></thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr v-for="c in m.colas" :key="c.nombre">
+              <td class="py-1.5"><span class="font-medium">{{ c.nombre }}</span><p class="text-xs text-slate-500">{{ c.descripcion }}</p></td>
+              <template v-if="c.ok">
+                <td class="py-1.5 pl-3 text-right tabular-nums" :class="c.waiting > 20 ? 'font-semibold text-amber-700' : ''">{{ c.waiting }}</td>
+                <td class="py-1.5 pl-3 text-right tabular-nums">{{ c.active }}</td>
+                <td class="py-1.5 pl-3 text-right tabular-nums text-slate-500">{{ c.delayed }}</td>
+                <td class="py-1.5 pl-3 text-right tabular-nums" :class="c.failed ? 'font-semibold text-red-700' : ''">{{ c.failed }}</td>
+              </template>
+              <td v-else colspan="4" class="py-1.5 text-right text-red-700">Sin conexión</td>
+            </tr>
+          </tbody>
+        </table></div>
+        <h3 class="mt-5 mb-2 font-semibold">Módulos contratados</h3>
+        <ul class="space-y-2 text-sm">
+          <li v-for="mod in m.modulos" :key="mod.codigo">
+            <div class="flex justify-between"><span>{{ mod.nombre }}</span><span class="tabular-nums text-slate-500">{{ mod.estudios }} de {{ m.estudios.activos }}</span></div>
+            <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-marca-600" :style="{ width: `${m.estudios.activos ? (mod.estudios / m.estudios.activos) * 100 : 0}%` }" /></div>
+          </li>
+        </ul>
+      </section>
     </div>
 
     <section class="tarjeta mb-6 p-4">

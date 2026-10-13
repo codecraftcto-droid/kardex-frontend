@@ -1,4 +1,6 @@
 <script setup>
+import Pestanas from '@/components/Pestanas.vue';
+import { usePeriodoTrabajo } from '@/composables/usePeriodoTrabajo';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, descargar, mensajeError } from '@/services/api';
@@ -18,8 +20,7 @@ const router = useRouter();
 const contexto = useContexto();
 const toast = useToast();
 
-const mesActual = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date()).slice(0, 7);
-const mes = ref(typeof route.query.periodo === 'string' && /^\d{6}$/.test(route.query.periodo) ? `${route.query.periodo.slice(0, 4)}-${route.query.periodo.slice(4)}` : mesActual);
+const mes = usePeriodoTrabajo();
 const periodo = computed(() => mes.value.replace('-', ''));
 const vista = computed(() => (['situacion', 'resultados', 'hoja'].includes(route.query.vista) ? route.query.vista : 'situacion'));
 const irA = (v) => router.replace({ query: { ...route.query, vista: v } });
@@ -99,7 +100,6 @@ const resultadoHoja = computed(() => {
 
 <template>
   <EncabezadoPagina titulo="Estados financieros" :subtitulo="contexto.empresaActiva?.razonSocial">
-    <input v-model="mes" type="month" class="input w-44" :max="mesActual" aria-label="Período" />
     <button v-if="d?.acciones.cerrarEjercicio" class="btn-secundario" @click="cierreEjercicio"><Icono nombre="candado" clase="size-4" /> {{ d.cierre ? 'Regenerar cierre' : 'Cierre del ejercicio' }} {{ d.anio }}</button>
     <button class="btn-secundario" :disabled="exportando || !d" @click="exportar"><Icono nombre="descargar" clase="size-4" /> {{ exportando ? 'Exportando…' : 'Exportar Excel' }}</button>
   </EncabezadoPagina>
@@ -117,19 +117,7 @@ const resultadoHoja = computed(() => {
       <p v-if="d.cierre" class="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800"><Icono nombre="check" clase="size-4" /> {{ d.cierre.glosa }}</p>
     </div>
 
-    <div class="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200" role="tablist">
-      <button
-        v-for="[k, t] in [['situacion', 'Situación financiera'], ['resultados', 'Estado de resultados'], ['hoja', 'Hoja de trabajo']]"
-        :key="k"
-        role="tab"
-        :aria-selected="vista === k"
-        class="-mb-px min-h-11 border-b-2 px-3 text-sm font-medium whitespace-nowrap"
-        :class="vista === k ? 'border-marca-700 text-marca-700' : 'border-transparent text-slate-500 hover:text-slate-700'"
-        @click="irA(k)"
-      >
-        {{ t }}
-      </button>
-    </div>
+    <Pestanas :opciones="[['situacion', 'Situación financiera'], ['resultados', 'Estado de resultados'], ['hoja', 'Hoja de trabajo']]" :activa="vista" @cambiar="irA" />
 
     <!-- Estado de situación financiera -->
     <template v-if="vista === 'situacion'">

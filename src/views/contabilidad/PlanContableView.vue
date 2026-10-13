@@ -1,4 +1,5 @@
 <script setup>
+import Pestanas from '@/components/Pestanas.vue';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, mensajeError } from '@/services/api';
@@ -199,20 +200,7 @@ const problemas = computed(() => (cfg.value?.operaciones ?? []).filter((o) => o.
   </section>
 
   <template v-else-if="datos">
-    <div class="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200" role="tablist">
-      <button
-        v-for="[k, t] in [['plan', `Plan de cuentas (${cuentas.length})`], ['operaciones', 'Cuentas por operación']]"
-        :key="k"
-        role="tab"
-        :aria-selected="vista === k"
-        class="-mb-px inline-flex min-h-11 items-center gap-1.5 border-b-2 px-3 text-sm font-medium whitespace-nowrap"
-        :class="vista === k ? 'border-marca-700 text-marca-700' : 'border-transparent text-slate-500 hover:text-slate-700'"
-        @click="irA(k)"
-      >
-        {{ t }}
-        <span v-if="k === 'operaciones' && problemas" class="insignia bg-amber-50 text-amber-800">{{ problemas }}</span>
-      </button>
-    </div>
+    <Pestanas :opciones="[['plan', `Plan de cuentas (${cuentas.length})`], ['operaciones', 'Cuentas por operación', problemas || null]]" :activa="vista" @cambiar="irA" />
 
     <!-- Plan de cuentas -->
     <template v-if="vista === 'plan'">

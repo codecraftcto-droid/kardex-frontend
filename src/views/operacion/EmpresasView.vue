@@ -1,6 +1,6 @@
 <script setup>
 import { confirmar } from '@/utils/dialogos';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, mensajeError } from '@/services/api';
 import { useAuth } from '@/stores/auth';
@@ -35,7 +35,7 @@ const columnas = [
   { clave: 'activo', titulo: 'Estado' },
 ];
 
-const vacio = () => ({ razonSocial: '', ruc: '', contacto: '', email: '', telefono: '', direccion: '', nombreComercial: '', cuentaDetracciones: '', exceptuadoRetencion: false, buenContribuyente: false, metodoValorizacion: 'PROMEDIO', activo: true });
+const vacio = () => ({ razonSocial: '', ruc: '', contacto: '', email: '', telefono: '', direccion: '', nombreComercial: '', cuentaDetracciones: '', exceptuadoRetencion: false, buenContribuyente: false, regimenTributario: 'GENERAL', metodoValorizacion: 'PROMEDIO', activo: true });
 const modal = reactive({ abierto: false, id: null, guardando: false, form: vacio() });
 
 function abrir(fila) {
@@ -83,6 +83,14 @@ async function eliminar(fila) {
 // ── Facturación electrónica: ?facturacion=<empresaId> (enlace desde Comprobantes) ──
 const route = useRoute();
 const router = useRouter();
+// ?editar=<id>: abre la edición (desde la ficha de la empresa)
+watch([() => route.query.editar, filas], ([id]) => {
+  const f = typeof id === 'string' && filas.value.find((e) => e.id === id);
+  if (f) {
+    abrir(f);
+    router.replace({ query: { ...route.query, editar: undefined } });
+  }
+});
 const empresaFacturacion = computed(() => {
   const id = route.query.facturacion;
   return typeof id === 'string' ? filas.value.find((e) => e.id === id) ?? contexto.empresas.find((e) => e.id === id) ?? null : null;
@@ -99,8 +107,7 @@ const abrirSire = (f) => router.push({ query: { ...route.query, sire: f.id } });
 const cerrarSire = () => router.replace({ query: { ...route.query, sire: undefined } });
 
 const accionesFila = (f) => [
-  auth.canEnEmpresa('cpe.configuracion.editar', f.id) && { texto: 'Facturación electrónica', icono: 'comprobante', alHacer: () => abrirFacturacion(f) },
-  auth.canEnEmpresa('sire.configuracion.editar', f.id) && { texto: 'Credenciales SIRE', icono: 'candado', alHacer: () => abrirSire(f) },
+  { texto: 'Ficha y configuración', icono: 'empresa', to: `/empresas/${f.id}` },
   auth.can('empresas.empresa.editar', { empresaId: f.id }) && { texto: 'Editar', icono: 'editar', alHacer: () => abrir(f) },
   auth.can('empresas.empresa.eliminar', { empresaId: f.id }) && { separador: true },
   auth.can('empresas.empresa.eliminar', { empresaId: f.id }) && { texto: 'Eliminar', icono: 'eliminar', peligro: true, alHacer: () => eliminar(f) },
@@ -125,6 +132,10 @@ const accionesFila = (f) => [
   </div>
 
   <TablaResponsiva :columnas="columnas" :filas="filas" :cargando="cargando" vacio="No hay empresas">
+    <template #celda-razonSocial="{ fila }">
+      <RouterLink :to="`/empresas/${fila.id}`" class="font-medium text-marca-700 hover:underline">{{ fila.razonSocial }}</RouterLink>
+      <p v-if="fila.nombreComercial" class="text-xs text-slate-500">{{ fila.nombreComercial }}</p>
+    </template>
     <template #celda-metodoValorizacion="{ fila }">{{ fila.metodoValorizacion === 'PEPS' ? 'PEPS' : 'Promedio ponderado' }}</template>
     <template #celda-activo="{ fila }"><InsigniaEstado :activo="fila.activo" textoSi="Activa" textoNo="Inactiva" /></template>
     <template #acciones="{ fila }"><MenuAcciones :acciones="accionesFila(fila)" :etiqueta="`Acciones de ${fila.razonSocial ?? fila.nombre}`" /></template>
@@ -177,6 +188,16 @@ const accionesFila = (f) => [
         <input v-model="modal.form.exceptuadoRetencion" type="checkbox" class="mt-0.5 size-5 accent-marca-700" />
         <span class="text-sm">Buen contribuyente o agente de retención <span class="block text-xs text-slate-500">Sus clientes no le retienen el 3% del IGV.</span></span>
       </label>
+      <div>
+        <label class="etiqueta" for="regimen">Régimen tributario</label>
+        <select id="regimen" v-model="modal.form.regimenTributario" class="input">
+          <option value="GENERAL">Régimen General</option>
+          <option value="MYPE">Régimen MYPE Tributario</option>
+          <option value="ESPECIAL">Régimen Especial (RER)</option>
+          <option value="NRUS">Nuevo RUS</option>
+        </select>
+        <p class="mt-1 text-xs text-slate-500">Define la tasa del pago a cuenta de renta en el PDT 621.</p>
+      </div>
       <label class="flex min-h-11 items-start gap-3 sm:col-span-2">
         <input v-model="modal.form.buenContribuyente" type="checkbox" class="mt-0.5 size-5 accent-marca-700" />
         <span class="text-sm">Buen contribuyente / UESP en el cronograma de SUNAT <span class="block text-xs text-slate-500">Sus vencimientos mensuales (SIRE, declaraciones) son los de ese grupo y no los del último dígito del RUC.</span></span>

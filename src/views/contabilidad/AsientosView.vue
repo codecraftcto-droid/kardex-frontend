@@ -1,4 +1,5 @@
 <script setup>
+import { usePeriodoTrabajo } from '@/composables/usePeriodoTrabajo';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, mensajeError } from '@/services/api';
@@ -38,8 +39,7 @@ const ORIGENES = {
   MANUAL: { texto: 'Manual', clase: 'bg-slate-100 text-slate-700' },
 };
 
-const mesActual = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date()).slice(0, 7);
-const mes = ref(typeof route.query.periodo === 'string' && /^\d{6}$/.test(route.query.periodo) ? `${route.query.periodo.slice(0, 4)}-${route.query.periodo.slice(4)}` : mesActual);
+const mes = usePeriodoTrabajo();
 const periodo = computed(() => mes.value.replace('-', ''));
 
 const resumen = ref(null);
@@ -175,7 +175,6 @@ const cerrar = () => router.replace({ query: { ...route.query, asiento: undefine
 
 <template>
   <EncabezadoPagina titulo="Asientos contables" :subtitulo="contexto.empresaActiva?.razonSocial">
-    <input v-model="mes" type="month" class="input w-44" :max="mesActual" aria-label="Período" />
     <button v-if="resumen?.acciones.registrar" class="btn-secundario" @click="nuevoManual"><Icono nombre="agregar" clase="size-4" /> Asiento manual</button>
     <button v-if="resumen?.acciones.generar && !resumen.sinPlan" class="btn-primario" :disabled="ocupado" @click="contabilizar()">
       <Icono nombre="check" clase="size-4" /> {{ ocupado ? 'Contabilizando…' : 'Contabilizar período' }}

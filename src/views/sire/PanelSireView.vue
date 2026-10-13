@@ -1,4 +1,5 @@
 <script setup>
+import Pestanas from '@/components/Pestanas.vue';
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, descargar, mensajeError } from '@/services/api';
@@ -177,19 +178,7 @@ async function exportar() {
   </section>
 
   <!-- Pestañas -->
-  <div class="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200" role="tablist">
-    <button
-      v-for="[k, t] in [['empresas', 'Empresas'], ['alertas', `Alertas${alertas.length ? ` (${alertas.length})` : ''}`], ['historial', 'Historial']]"
-      :key="k"
-      role="tab"
-      :aria-selected="vista === k"
-      class="-mb-px min-h-11 border-b-2 px-3 text-sm font-medium whitespace-nowrap"
-      :class="vista === k ? 'border-marca-700 text-marca-700' : 'border-transparent text-slate-500 hover:text-slate-700'"
-      @click="irA(k)"
-    >
-      {{ t }}
-    </button>
-  </div>
+  <Pestanas :opciones="[['empresas', 'Empresas'], ['alertas', 'Alertas', alertas.length || null], ['historial', 'Historial']]" :activa="vista" @cambiar="irA" />
 
   <!-- Empresas × períodos -->
   <template v-if="vista === 'empresas'">

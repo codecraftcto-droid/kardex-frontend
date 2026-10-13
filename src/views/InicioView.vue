@@ -8,6 +8,7 @@ import { cant, fechaHora, soles } from '@/utils/formato';
 import { MOTIVOS, estiloTipo } from '@/utils/kardex';
 import Icono from '@/components/Icono.vue';
 import GraficoBarras from '@/components/GraficoBarras.vue';
+import PendientesEstudio from '@/components/PendientesEstudio.vue';
 
 const auth = useAuth();
 const contexto = useContexto();
@@ -221,6 +222,9 @@ const pctStock = (s) => Math.min(100, Math.round((Number(s.cantidad) / Math.max(
         <p v-if="resumen.sedes != null" class="mt-1 text-xs text-slate-500">en {{ resumen.sedes }} sede(s)</p>
       </RouterLink>
     </section>
+
+    <!-- Pendientes SUNAT de todas las empresas del estudio (solo con acceso al SIRE) -->
+    <PendientesEstudio v-if="auth.canAlguno('sire.periodo.ver')" class="mb-5" />
 
     <div class="grid gap-5 xl:grid-cols-3">
       <!-- ═════════ Gráfico ═════════ -->

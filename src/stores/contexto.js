@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { api } from '@/services/api';
+import { mesActualLima } from '@/utils/fechas';
 
 /** Empresa activa: el usuario solo puede elegir entre las suyas. */
 export const useContexto = defineStore('contexto', () => {
@@ -9,6 +10,17 @@ export const useContexto = defineStore('contexto', () => {
   let clave = null;
 
   const empresaActiva = computed(() => empresas.value.find((e) => e.id === empresaActivaId.value) || null);
+
+  // Período de trabajo (AAAA-MM): uno solo para todas las pantallas que trabajan por mes
+  let guardado = null;
+  try { guardado = localStorage.getItem('kardex:periodo'); } catch { /* almacenamiento no disponible */ }
+  const mes = ref(/^\d{4}-\d{2}$/.test(guardado ?? '') && guardado <= mesActualLima() ? guardado : mesActualLima());
+  const periodo = computed(() => mes.value.replace('-', ''));
+  function fijarMes(valor) {
+    if (!/^\d{4}-\d{2}$/.test(valor ?? '')) return;
+    mes.value = valor > mesActualLima() ? mesActualLima() : valor;
+    try { localStorage.setItem('kardex:periodo', mes.value); } catch { /* almacenamiento no disponible */ }
+  }
 
   async function cargar(usuarioId) {
     clave = `kardex:empresa:${usuarioId}`;
@@ -29,5 +41,5 @@ export const useContexto = defineStore('contexto', () => {
     empresaActivaId.value = null;
   }
 
-  return { empresas, empresaActivaId, empresaActiva, cargar, seleccionar, $reset };
+  return { empresas, empresaActivaId, empresaActiva, mes, periodo, fijarMes, cargar, seleccionar, $reset };
 });

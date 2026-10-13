@@ -8,6 +8,7 @@ export const MOTIVOS = {
   ANULACION: 'Anulación',
   TRANSFERENCIA_SALIDA: 'Transferencia (salida)',
   TRANSFERENCIA_ENTRADA: 'Transferencia (entrada)',
+  SALDO_INICIAL: 'Saldo inicial',
 };
 
 export const ESTADOS_TRANSFERENCIA = {

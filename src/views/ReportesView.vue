@@ -30,7 +30,7 @@ const REPORTES = [
   { id: 'movimientos', titulo: 'Movimientos', descripcion: 'Entradas y salidas en un rango de fechas', icono: 'movimientos', permisos: ['reporte.movimientos.ver'] },
   { id: 'valorizacion', titulo: 'Valorización', descripcion: 'Valor del inventario a una fecha de corte', icono: 'kardex', permisos: ['reporte.valorizacion.ver', 'kardex.costos.ver'] },
   { id: 'transferencias', titulo: 'Transferencias', descripcion: 'Traslados entre almacenes y faltantes', icono: 'transferencias', permisos: ['transferencia.ver'] },
-  { id: 'ventas', titulo: 'Registro de ventas', descripcion: 'Comprobantes del periodo (formato 14.1)', icono: 'comprobante', permisos: ['reporte.ventas.ver'] },
+  { id: 'ventas', titulo: 'Ventas del período', descripcion: 'Comprobantes emitidos del período (el registro oficial de ventas va por el SIRE)', icono: 'comprobante', permisos: ['reporte.ventas.ver'] },
   { id: 'caja', titulo: 'Turnos de caja', descripcion: 'Arqueos por caja y medio de pago', icono: 'caja', permisos: ['reporte.ventas.ver'] },
   { id: 'cxc', titulo: 'Cuentas por cobrar', descripcion: 'Saldos de clientes por antigüedad (al día de hoy)', icono: 'tarjeta', permisos: ['reporte.cxc.ver'] },
   { id: 'cobranzas', titulo: 'Cobranzas', descripcion: 'Pagos recibidos de ventas al crédito', icono: 'tarjeta', permisos: ['reporte.cxc.ver'] },

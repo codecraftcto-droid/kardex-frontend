@@ -1,4 +1,6 @@
 <script setup>
+import Pestanas from '@/components/Pestanas.vue';
+import { usePeriodoTrabajo } from '@/composables/usePeriodoTrabajo';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, descargar, mensajeError } from '@/services/api';
@@ -21,8 +23,7 @@ const router = useRouter();
 const contexto = useContexto();
 const toast = useToast();
 
-const mesActual = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date()).slice(0, 7);
-const mes = ref(typeof route.query.periodo === 'string' && /^\d{6}$/.test(route.query.periodo) ? `${route.query.periodo.slice(0, 4)}-${route.query.periodo.slice(4)}` : mesActual);
+const mes = usePeriodoTrabajo();
 const periodo = computed(() => mes.value.replace('-', ''));
 const vista = computed(() => (route.query.libro === 'mayor' ? 'mayor' : 'diario'));
 const irA = (v) => router.replace({ query: { ...route.query, libro: v } });
@@ -96,23 +97,10 @@ async function exportar() {
 
 <template>
   <EncabezadoPagina titulo="Libros contables" :subtitulo="contexto.empresaActiva?.razonSocial">
-    <input v-model="mes" type="month" class="input w-44" :max="mesActual" aria-label="Período" />
     <button class="btn-secundario" :disabled="exportando" @click="exportar"><Icono nombre="descargar" clase="size-4" /> {{ exportando ? 'Exportando…' : 'Exportar Excel' }}</button>
   </EncabezadoPagina>
 
-  <div class="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200" role="tablist">
-    <button
-      v-for="[k, t] in [['diario', 'Libro Diario'], ['mayor', 'Libro Mayor']]"
-      :key="k"
-      role="tab"
-      :aria-selected="vista === k"
-      class="-mb-px min-h-11 border-b-2 px-3 text-sm font-medium whitespace-nowrap"
-      :class="vista === k ? 'border-marca-700 text-marca-700' : 'border-transparent text-slate-500 hover:text-slate-700'"
-      @click="irA(k)"
-    >
-      {{ t }}
-    </button>
-  </div>
+  <Pestanas :opciones="[['diario', 'Libro Diario'], ['mayor', 'Libro Mayor']]" :activa="vista" @cambiar="irA" />
 
   <!-- Libro Diario -->
   <template v-if="vista === 'diario'">

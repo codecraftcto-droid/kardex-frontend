@@ -1,4 +1,5 @@
 <script setup>
+import EnlaceArchivoSunat from '@/components/EnlaceArchivoSunat.vue';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { api, mensajeError } from '@/services/api';
@@ -175,8 +176,8 @@ async function emitirNC() {
         <div v-if="c.sunatXml || c.sunatCdr || c.sunatPdf">
           <dt class="text-xs text-slate-500">Archivos</dt>
           <dd class="flex flex-wrap gap-3">
-            <a v-if="c.sunatXml" :href="c.sunatXml" target="_blank" rel="noopener" class="text-marca-700 hover:underline">XML</a>
-            <a v-if="c.sunatCdr" :href="c.sunatCdr" target="_blank" rel="noopener" class="text-marca-700 hover:underline">CDR</a>
+            <EnlaceArchivoSunat v-if="c.sunatXml" :valor="c.sunatXml" texto="XML" :nombre="`${c.serie}-${c.numero}.xml`" />
+            <EnlaceArchivoSunat v-if="c.sunatCdr" :valor="c.sunatCdr" texto="CDR" :nombre="`R-${c.serie}-${c.numero}.zip`" />
             <a v-if="c.sunatPdf" :href="c.sunatPdf" target="_blank" rel="noopener" class="text-marca-700 hover:underline">PDF del proveedor</a>
           </dd>
         </div>

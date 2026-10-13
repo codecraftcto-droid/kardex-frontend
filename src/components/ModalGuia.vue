@@ -9,6 +9,7 @@ import { TIPOS_DOCUMENTO } from '@/utils/pos';
 import { pedirTexto } from '@/utils/dialogos';
 import BaseModal from './BaseModal.vue';
 import InsigniaSunat from './InsigniaSunat.vue';
+import EnlaceArchivoSunat from './EnlaceArchivoSunat.vue';
 import Icono from './Icono.vue';
 
 /** Detalle de una guía de remisión electrónica. */
@@ -109,8 +110,8 @@ const imprimir = (f) => window.open(router.resolve(`/imprimir/guia/${g.value.id}
         </table>
       </div>
       <p v-if="g.sunatXml || g.sunatCdr || g.sunatPdf" class="flex gap-4 text-sm">
-        <a v-if="g.sunatXml" :href="g.sunatXml" target="_blank" rel="noopener" class="text-marca-700 hover:underline">XML</a>
-        <a v-if="g.sunatCdr" :href="g.sunatCdr" target="_blank" rel="noopener" class="text-marca-700 hover:underline">CDR</a>
+        <EnlaceArchivoSunat v-if="g.sunatXml" :valor="g.sunatXml" texto="XML" :nombre="`${g.serie}-${g.numero}.xml`" />
+        <EnlaceArchivoSunat v-if="g.sunatCdr" :valor="g.sunatCdr" texto="CDR" :nombre="`R-${g.serie}-${g.numero}.zip`" />
         <a v-if="g.sunatPdf" :href="g.sunatPdf" target="_blank" rel="noopener" class="text-marca-700 hover:underline">PDF del proveedor</a>
       </p>
     </div>
